@@ -1,0 +1,53 @@
+name: Daily Cloudflare Fetch
+
+on:
+  schedule:
+    # Tous les jours à 03:00 UTC (05:00 heure belge)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # Permet le lancement manuel
+
+permissions:
+  contents: write
+
+jobs:
+  fetch-and-transform:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create .env
+        run: |
+          echo "CLOUDFLARE_API_TOKEN=${{ secrets.CLOUDFLARE_API_TOKEN }}" >> .env
+          echo "CLOUDFLARE_ZONE_ID=${{ secrets.CLOUDFLARE_ZONE_ID }}" >> .env
+          echo "DOMAIN=italiaanse-percolator.nl" >> .env
+
+      - name: Test Cloudflare connection
+        run: python -m src.fetch_cloudflare --test
+
+      - name: Fetch last 7 days
+        run: python -m src.fetch_cloudflare --days 7
+
+      - name: Transform to DuckDB
+        run: python -m src.transform
+
+      - name: Commit & Push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "data: Daily Cloudflare fetch $(date +%F)"
+            git push
+          fi
