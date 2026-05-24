@@ -25,17 +25,27 @@ load_dotenv()
 CF_API_URL = "https://api.cloudflare.com/client/v4/graphql"
 CF_REST_URL = "https://api.cloudflare.com/client/v4"
 
-API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "")
+API_KEY = os.getenv("CLOUDFLARE_API_KEY", "")
+API_EMAIL = os.getenv("CLOUDFLARE_EMAIL", "")
+API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN", "")  # fallback Bearer token
 ZONE_ID = os.getenv("CLOUDFLARE_ZONE_ID", "")
 DOMAIN = os.getenv("DOMAIN", "italiaanse-percolator.nl")
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RAW_DIR = DATA_DIR / "raw" / "cloudflare"
 
-HEADERS = {
-    "Authorization": f"Bearer {API_TOKEN}",
-    "Content-Type": "application/json",
-}
+# Auth: prefer Global API Key, fallback to Bearer token
+if API_KEY and API_EMAIL:
+    HEADERS = {
+        "X-Auth-Email": API_EMAIL,
+        "X-Auth-Key": API_KEY,
+        "Content-Type": "application/json",
+    }
+else:
+    HEADERS = {
+        "Authorization": f"Bearer {API_TOKEN}",
+        "Content-Type": "application/json",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -44,8 +54,10 @@ HEADERS = {
 def _check_env():
     """Vérifie que les variables d'environnement sont configurées."""
     missing = []
-    if not API_TOKEN:
-        missing.append("CLOUDFLARE_API_TOKEN")
+    if not API_KEY and not API_TOKEN:
+        missing.append("CLOUDFLARE_API_KEY (or CLOUDFLARE_API_TOKEN)")
+    if API_KEY and not API_EMAIL:
+        missing.append("CLOUDFLARE_EMAIL")
     if not ZONE_ID:
         missing.append("CLOUDFLARE_ZONE_ID")
     if missing:
@@ -54,26 +66,19 @@ def _check_env():
 
 
 def test_connection():
-    """Teste le token et l'accès à la zone."""
+    """Teste l'authentification et l'accès à la zone."""
     _check_env()
 
-    # 1. Vérifier le token
-    r = requests.get(f"{CF_REST_URL}/user/tokens/verify", headers=HEADERS)
-    token_data = r.json()
-    if not token_data.get("success"):
-        print("❌ Token invalide.")
-        print(json.dumps(token_data, indent=2))
-        return False
-    print(f"✓ Token valide — statut: {token_data['result']['status']}")
-
-    # 2. Vérifier la zone
+    # Vérifier l'accès à la zone directement
     r = requests.get(f"{CF_REST_URL}/zones/{ZONE_ID}", headers=HEADERS)
     zone_data = r.json()
     if not zone_data.get("success"):
-        print(f"❌ Zone {ZONE_ID} inaccessible.")
+        print(f"❌ Accès refusé (HTTP {r.status_code}).")
         print(json.dumps(zone_data, indent=2))
         return False
     zone = zone_data["result"]
+    auth_mode = "API Key" if API_KEY else "Bearer Token"
+    print(f"✓ Auth OK ({auth_mode})")
     print(f"✓ Zone OK — {zone['name']} ({zone['status']})")
     print(f"  Plan: {zone.get('plan', {}).get('name', 'N/A')}")
 
@@ -83,11 +88,10 @@ def test_connection():
 # ---------------------------------------------------------------------------
 # GraphQL Queries
 # ---------------------------------------------------------------------------
-QUERY_HTTP_REQUESTS = """
-query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
+QUERY_DAILY = """
+query DailyStats($zoneTag: String!, $since: Date!, $until: Date!) {
   viewer {
     zones(filter: {zoneTag: $zoneTag}) {
-
       httpRequests1dGroups(
         limit: 1000
         filter: {date_geq: $since, date_leq: $until}
@@ -104,6 +108,15 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         }
         uniq { uniques }
       }
+    }
+  }
+}
+"""
+
+QUERY_ADAPTIVE = """
+query AdaptiveStats($zoneTag: String!, $since: Date!, $until: Date!) {
+  viewer {
+    zones(filter: {zoneTag: $zoneTag}) {
 
       topPaths: httpRequestsAdaptiveGroups(
         limit: 100
@@ -111,9 +124,7 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         orderBy: [count_DESC]
       ) {
         count
-        dimensions {
-          clientRequestPath
-        }
+        dimensions { clientRequestPath }
       }
 
       topUserAgents: httpRequestsAdaptiveGroups(
@@ -122,9 +133,7 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         orderBy: [count_DESC]
       ) {
         count
-        dimensions {
-          userAgent
-        }
+        dimensions { userAgent }
       }
 
       topCountries: httpRequestsAdaptiveGroups(
@@ -133,9 +142,7 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         orderBy: [count_DESC]
       ) {
         count
-        dimensions {
-          clientCountryName
-        }
+        dimensions { clientCountryName }
       }
 
       statusCodes: httpRequestsAdaptiveGroups(
@@ -144,9 +151,7 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         orderBy: [count_DESC]
       ) {
         count
-        dimensions {
-          edgeResponseStatus
-        }
+        dimensions { edgeResponseStatus }
       }
 
       cacheStatus: httpRequestsAdaptiveGroups(
@@ -155,28 +160,29 @@ query HttpRequests($zoneTag: String!, $since: Date!, $until: Date!) {
         orderBy: [count_DESC]
       ) {
         count
-        dimensions {
-          cacheStatus
-        }
-      }
-
-      bots: httpRequestsAdaptiveGroups(
-        limit: 50
-        filter: {date_geq: $since, date_leq: $until, botManagementDecision_neq: "likely_human"}
-        orderBy: [count_DESC]
-      ) {
-        count
-        dimensions {
-          userAgent
-          botManagementDecision
-          clientCountryName
-        }
+        dimensions { cacheStatus }
       }
 
     }
   }
 }
 """
+
+
+def _run_graphql(query: str, variables: dict) -> dict:
+    """Exécute une requête GraphQL et retourne les données de la première zone."""
+    r = requests.post(CF_API_URL, headers=HEADERS, json={"query": query, "variables": variables})
+    if r.status_code != 200:
+        print(f"❌ HTTP {r.status_code}")
+        print(r.text[:500])
+        return {}
+    data = r.json()
+    if data.get("errors"):
+        print("⚠️ Erreurs GraphQL:")
+        for err in data["errors"]:
+            print(f"  - {err.get('message', err)}")
+    zones = data.get("data", {}).get("viewer", {}).get("zones", [])
+    return zones[0] if zones else {}
 
 
 def fetch_analytics(days: int = 7) -> dict:
@@ -186,41 +192,35 @@ def fetch_analytics(days: int = 7) -> dict:
     until_date = datetime.now(timezone.utc).date()
     since_date = until_date - timedelta(days=days)
 
-    variables = {
+    print(f"📡 Cloudflare Analytics: {since_date} → {until_date} ({days}j)")
+
+    # 1. Daily aggregates (supports wide time ranges)
+    print("  → Daily stats...")
+    daily_data = _run_graphql(QUERY_DAILY, {
         "zoneTag": ZONE_ID,
         "since": since_date.isoformat(),
         "until": until_date.isoformat(),
-    }
+    })
 
-    print(f"📡 Requête Cloudflare Analytics: {since_date} → {until_date} ({days}j)")
+    # 2. Adaptive groups — query per day (Free plan: max 1 day range)
+    print("  → Adaptive stats (par jour)...")
+    all_paths, all_uas, all_countries, all_status, all_cache = [], [], [], [], []
 
-    r = requests.post(
-        CF_API_URL,
-        headers=HEADERS,
-        json={"query": QUERY_HTTP_REQUESTS, "variables": variables},
-    )
+    current = since_date
+    while current <= until_date:
+        day_str = current.isoformat()
+        day_data = _run_graphql(QUERY_ADAPTIVE, {
+            "zoneTag": ZONE_ID,
+            "since": day_str,
+            "until": day_str,
+        })
+        all_paths.extend(day_data.get("topPaths", []))
+        all_uas.extend(day_data.get("topUserAgents", []))
+        all_countries.extend(day_data.get("topCountries", []))
+        all_status.extend(day_data.get("statusCodes", []))
+        all_cache.extend(day_data.get("cacheStatus", []))
+        current += timedelta(days=1)
 
-    if r.status_code != 200:
-        print(f"❌ HTTP {r.status_code}")
-        print(r.text[:500])
-        sys.exit(1)
-
-    data = r.json()
-
-    if data.get("errors"):
-        print("❌ Erreurs GraphQL:")
-        for err in data["errors"]:
-            print(f"  - {err.get('message', err)}")
-        # Continue quand même — certains champs peuvent avoir répondu
-        if not data.get("data"):
-            sys.exit(1)
-
-    zones = data.get("data", {}).get("viewer", {}).get("zones", [])
-    if not zones:
-        print("❌ Aucune donnée retournée pour cette zone.")
-        sys.exit(1)
-
-    zone_data = zones[0]
     print(f"✓ Données reçues")
 
     return {
@@ -231,13 +231,13 @@ def fetch_analytics(days: int = 7) -> dict:
             "until": until_date.isoformat(),
             "fetched_at": datetime.now(timezone.utc).isoformat(),
         },
-        "daily": zone_data.get("httpRequests1dGroups", []),
-        "top_paths": zone_data.get("topPaths", []),
-        "top_user_agents": zone_data.get("topUserAgents", []),
-        "top_countries": zone_data.get("topCountries", []),
-        "status_codes": zone_data.get("statusCodes", []),
-        "cache_status": zone_data.get("cacheStatus", []),
-        "bots": zone_data.get("bots", []),
+        "daily": daily_data.get("httpRequests1dGroups", []),
+        "top_paths": all_paths,
+        "top_user_agents": all_uas,
+        "top_countries": all_countries,
+        "status_codes": all_status,
+        "cache_status": all_cache,
+        "bots": [],
     }
 
 

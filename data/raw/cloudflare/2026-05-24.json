@@ -1,0 +1,968 @@
+{
+  "meta": {
+    "domain": "italiaanse-percolator.nl",
+    "zone_id": "73640ac40822253c41c4c793aadb6a54",
+    "since": "2026-05-17",
+    "until": "2026-05-24",
+    "fetched_at": "2026-05-24T19:22:53.631856+00:00"
+  },
+  "daily": [
+    {
+      "dimensions": {
+        "date": "2026-05-24"
+      },
+      "sum": {
+        "bytes": 12359729,
+        "cachedBytes": 3636,
+        "cachedRequests": 2,
+        "pageViews": 378,
+        "requests": 727,
+        "threats": 0
+      },
+      "uniq": {
+        "uniques": 37
+      }
+    }
+  ],
+  "top_paths": [
+    {
+      "count": 64,
+      "dimensions": {
+        "clientRequestPath": "/"
+      }
+    },
+    {
+      "count": 38,
+      "dimensions": {
+        "clientRequestPath": "/beste-italiaanse-percolators.html"
+      }
+    },
+    {
+      "count": 23,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/hoe-kies-je-de-juiste-percolator.html"
+      }
+    },
+    {
+      "count": 22,
+      "dimensions": {
+        "clientRequestPath": "/vergelijking/index.html"
+      }
+    },
+    {
+      "count": 9,
+      "dimensions": {
+        "clientRequestPath": "/alle-reviews.html"
+      }
+    },
+    {
+      "count": 9,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-6-kops.html"
+      }
+    },
+    {
+      "count": 8,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-brikka-review.html"
+      }
+    },
+    {
+      "count": 8,
+      "dimensions": {
+        "clientRequestPath": "/categories/elektrische-percolators.html"
+      }
+    },
+    {
+      "count": 8,
+      "dimensions": {
+        "clientRequestPath": "/disclaimer.html"
+      }
+    },
+    {
+      "count": 8,
+      "dimensions": {
+        "clientRequestPath": "/alessi-la-conica-review.html"
+      }
+    },
+    {
+      "count": 7,
+      "dimensions": {
+        "clientRequestPath": "/marques/alessi/pulcina.html"
+      }
+    },
+    {
+      "count": 7,
+      "dimensions": {
+        "clientRequestPath": "/robots.txt"
+      }
+    },
+    {
+      "count": 7,
+      "dimensions": {
+        "clientRequestPath": "/categories/accessoires.html"
+      }
+    },
+    {
+      "count": 7,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/hoe-onderhoud-je-een-percolator.html"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/server-status"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-3-kops.html"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/v2/api-docs"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/marques/index.html"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/venus.html"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/.vscode/sftp.json"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/api/swagger.json"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/favicon.svg"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/.env"
+      }
+    },
+    {
+      "count": 6,
+      "dimensions": {
+        "clientRequestPath": "/alessi-9090-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/grosche-milano-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-venus-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/beste-koffiebonen-italiaanse-percolator.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-musa-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/alessi-pulcina-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-dama-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/.git/config"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-aluminium.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/graphql"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-moka-timer-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/giannini-giannina-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/contact.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/___proxy_subdomain_whm/login"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/.DS_Store"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-moka-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/cilio-classico-electric-review.html"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "clientRequestPath": "/api/graphql"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/info.php"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/search"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/console/"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/swagger/swagger-ui.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/telescope/requests"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/favicon.ico"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/italiaanse-percolator-gebruiken-handleiding.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/api/gql"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/webjars/swagger-ui/index.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/marques/grosche/milano.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/v3/api-docs"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/ecp/Current/exporttool/microsoft.exchange.ediscovery.exporttool.application"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/over-ons.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/@vite/env"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/trace.axd"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/Images/italiaanse-percolator-4.png"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/actuator/env"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/api"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/config.json"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/swagger/v1/swagger.json"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/swagger/index.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-inductie.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/server"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/rommelsbacher-eko366-review.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/___proxy_subdomain_cpanel"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/swagger.json"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/login.action"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/about"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/bialetti-fiammetta-review.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/marques/grosche/milano-stovetop.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/debug/default/view"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/swagger-ui.html"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/.well-known/security.txt"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/api-docs/swagger.json"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "clientRequestPath": "/v2/_catalog"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/moka-express.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/index.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/Images/bialetti_brikka.jpg"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/fiammetta.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-1-2-kops.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/cdn-cgi/rum"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/boutique.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/index.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/brikka.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/Images/italiaanse-percolator-5.png"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/actuator/health"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/producten/alessi-percolator-moka-black-dc06-1-b-1-kops-door-david-chipperfield.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/Images/italiaanse-percolator-7.png"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/graphql/api"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/categories/percolators-rvs.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/producten/alessi-percolator-pulcina-mdl02-3-b-zwart-3-kops-door-michele-de-lucchi.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/koopgids/percolator-vs-espressoapparaat.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/style.css"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/Images/alessi_pulcina.jpg"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/cdn-cgi/scripts/5c5dd728/cloudflare-static/email-decode.min.js"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/mini-express.html"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientRequestPath": "/marques/bialetti/musa.html"
+      }
+    }
+  ],
+  "top_user_agents": [
+    {
+      "count": 105,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 100,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 98,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 93,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 84,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (l9scan/2.0.432313e22383e21323e2430313; +https://leakix.net)"
+      }
+    },
+    {
+      "count": 82,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (l9scan/2.0.133323e2735313e27363e2237313; +https://leakix.net)"
+      }
+    },
+    {
+      "count": 23,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 26_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/144.0.7559.95 Mobile/15E148 Safari/604.1"
+      }
+    },
+    {
+      "count": 19,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 18,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 18,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+      }
+    },
+    {
+      "count": 17,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:132.0) Gecko/20100101 Firefox/132.0"
+      }
+    },
+    {
+      "count": 17,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/133.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 11,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/148.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 10,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (compatible; seoLyt/1.0; +https://seolyt.com)"
+      }
+    },
+    {
+      "count": 5,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "userAgent": "axios/1.13.6"
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm) Chrome/116.0.1938.76 Safari/537.36"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "userAgent": "DuckDuckBot/1.1; (+http://duckduckgo.com/duckduckbot.html)"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (l9scan/2.0.36732353a353138363a3a303330333a303037343a363036323; +https://leakix.net)"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (l9scan/2.0.73564693a333433616a3a313330333a303037343a363036323; +https://leakix.net)"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (iPhone13,2; U; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/602.1.50 (KHTML, like Gecko) Version/10.0 Mobile/15E148 Safari/602.1"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; ClaudeBot/1.0; +claudebot@anthropic.com)"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.5938.132 Safari/537.36"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/146.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Go-http-client/1.1"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36; compatible; OAI-SearchBot/1.4; robots.txt; +https://openai.com/searchbot"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "userAgent": "Python/3.10 aiohttp/3.11.11"
+      }
+    }
+  ],
+  "top_countries": [
+    {
+      "count": 328,
+      "dimensions": {
+        "clientCountryName": "US"
+      }
+    },
+    {
+      "count": 173,
+      "dimensions": {
+        "clientCountryName": "DE"
+      }
+    },
+    {
+      "count": 106,
+      "dimensions": {
+        "clientCountryName": "BG"
+      }
+    },
+    {
+      "count": 93,
+      "dimensions": {
+        "clientCountryName": "CH"
+      }
+    },
+    {
+      "count": 11,
+      "dimensions": {
+        "clientCountryName": "BE"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientCountryName": "SE"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientCountryName": "IE"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientCountryName": "RS"
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "clientCountryName": "GB"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "clientCountryName": "NL"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "clientCountryName": "FI"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "clientCountryName": "PL"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "clientCountryName": "BR"
+      }
+    },
+    {
+      "count": 1,
+      "dimensions": {
+        "clientCountryName": "UA"
+      }
+    }
+  ],
+  "status_codes": [
+    {
+      "count": 410,
+      "dimensions": {
+        "edgeResponseStatus": 200
+      }
+    },
+    {
+      "count": 193,
+      "dimensions": {
+        "edgeResponseStatus": 404
+      }
+    },
+    {
+      "count": 87,
+      "dimensions": {
+        "edgeResponseStatus": 301
+      }
+    },
+    {
+      "count": 23,
+      "dimensions": {
+        "edgeResponseStatus": 405
+      }
+    },
+    {
+      "count": 11,
+      "dimensions": {
+        "edgeResponseStatus": 304
+      }
+    },
+    {
+      "count": 4,
+      "dimensions": {
+        "edgeResponseStatus": 499
+      }
+    },
+    {
+      "count": 3,
+      "dimensions": {
+        "edgeResponseStatus": 204
+      }
+    }
+  ],
+  "cache_status": [
+    {
+      "count": 669,
+      "dimensions": {
+        "cacheStatus": "dynamic"
+      }
+    },
+    {
+      "count": 41,
+      "dimensions": {
+        "cacheStatus": "miss"
+      }
+    },
+    {
+      "count": 19,
+      "dimensions": {
+        "cacheStatus": "none"
+      }
+    },
+    {
+      "count": 2,
+      "dimensions": {
+        "cacheStatus": "hit"
+      }
+    }
+  ],
+  "bots": []
+}

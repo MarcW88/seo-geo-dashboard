@@ -180,7 +180,7 @@ def transform_file(filepath: Path, conn: duckdb.DuckDBPyConnection):
     for row in data.get("bots", []):
         dims = row.get("dimensions", {})
         ua = dims.get("userAgent", "")
-        decision = dims.get("botManagementDecision", "")
+        decision = str(dims.get("botScore", dims.get("botManagementDecision", "")))
         country = dims.get("clientCountryName", "")
         count = row.get("count", 0)
         conn.execute("INSERT INTO cf_bots VALUES (?, ?, ?, ?, ?, ?, ?)", [since, until, ua, decision, country, count, fetched_at])
