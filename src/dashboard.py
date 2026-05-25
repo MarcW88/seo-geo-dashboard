@@ -177,16 +177,23 @@ def classify_path(path: str) -> str:
 # ---------------------------------------------------------------------------
 def ensure_database():
     import shutil
-    # Check if local DB exists and is valid (not empty)
+    # Check if local DB exists and has cf_http_requests table
+    needs_copy = False
     if DB_PATH.exists() and DB_PATH.stat().st_size > 1000:
-        # Valid local DB, use it
-        if str(_APP_ROOT).startswith("/mount"):
-            # On Streamlit Cloud, check if we need to refresh from private repo
-            if DB_PATH.stat().st_size < 1000:
-                if LOCAL_PRIVATE_DB_PATH.exists():
-                    shutil.copy2(LOCAL_PRIVATE_DB_PATH, DB_PATH)
+        # Check if it has the Log Explorer table
+        try:
+            test_conn = duckdb.connect(str(DB_PATH), read_only=True)
+            tables = test_conn.execute("SHOW TABLES").fetchdf()["name"].values
+            test_conn.close()
+            if "cf_http_requests" not in tables:
+                needs_copy = True
+        except:
+            needs_copy = True
     else:
-        # Local DB doesn't exist or is empty, copy from private repo
+        needs_copy = True
+    
+    if needs_copy:
+        # Copy from private repo
         if LOCAL_PRIVATE_DB_PATH.exists() and LOCAL_PRIVATE_DB_PATH.stat().st_size > 1000:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(LOCAL_PRIVATE_DB_PATH, DB_PATH)
