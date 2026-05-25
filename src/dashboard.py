@@ -18,9 +18,18 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
-DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cloudflare.duckdb"
-LOCAL_PRIVATE_DB_PATH = Path(__file__).resolve().parent.parent.parent / "seo-geo-dashboard-data" / "data" / "cloudflare.duckdb"
+_APP_ROOT = Path(__file__).resolve().parent.parent
+_LOCAL_DATA = _APP_ROOT / "data" / "cloudflare.duckdb"
+_TMP_DATA = Path("/tmp/cloudflare.duckdb")
+
+# On Streamlit Cloud /mount/src/ is read-only → use /tmp/; locally use data/
+DB_PATH = _TMP_DATA if not _LOCAL_DATA.parent.exists() or not _LOCAL_DATA.parent.stat().st_mode & 0o200 else _LOCAL_DATA
+LOCAL_PRIVATE_DB_PATH = _APP_ROOT.parent / "seo-geo-dashboard-data" / "data" / "cloudflare.duckdb"
 PRIVATE_DB_URL = "https://api.github.com/repos/MarcW88/seo-geo-dashboard-data/contents/data/cloudflare.duckdb"
+
+# Always prefer /tmp on Streamlit Cloud (path starts with /mount)
+if str(_APP_ROOT).startswith("/mount"):
+    DB_PATH = _TMP_DATA
 
 st.set_page_config(
     page_title="SEO/GEO Dashboard — italiaanse-percolator.nl",
@@ -86,9 +95,11 @@ def ensure_database():
         timeout=30,
     )
     if meta.status_code != 200:
+        st.warning(f"⚠️ GitHub API step1 failed: HTTP {meta.status_code} — {meta.text[:200]}")
         return
     download_url = meta.json().get("download_url", "")
     if not download_url:
+        st.warning(f"⚠️ No download_url in GitHub response: {meta.text[:200]}")
         return
 
     # Step 2 : télécharge le fichier binaire via le download_url signé
@@ -99,6 +110,8 @@ def ensure_database():
     )
     if content.status_code == 200 and len(content.content) > 1000:
         DB_PATH.write_bytes(content.content)
+    else:
+        st.warning(f"⚠️ GitHub download step2 failed: HTTP {content.status_code}, size={len(content.content)}")
 
 
 @st.cache_resource
