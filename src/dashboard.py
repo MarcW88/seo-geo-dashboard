@@ -19,6 +19,7 @@ import streamlit as st
 # Config
 # ---------------------------------------------------------------------------
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cloudflare.duckdb"
+LOCAL_PRIVATE_DB_PATH = Path(__file__).resolve().parent.parent.parent / "seo-geo-dashboard-data" / "data" / "cloudflare.duckdb"
 PRIVATE_DB_URL = "https://raw.githubusercontent.com/MarcW88/seo-geo-dashboard-data/main/data/cloudflare.duckdb"
 
 st.set_page_config(
@@ -68,6 +69,11 @@ def get_conn():
 
 def ensure_database():
     if DB_PATH.exists():
+        return
+
+    if LOCAL_PRIVATE_DB_PATH.exists():
+        DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+        DB_PATH.write_bytes(LOCAL_PRIVATE_DB_PATH.read_bytes())
         return
 
     token = st.secrets.get("GITHUB_TOKEN", "")
