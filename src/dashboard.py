@@ -593,8 +593,8 @@ st.markdown('<div class="section-label">Request details</div>', unsafe_allow_htm
 
 if HAS_HTTP_LOGS:
     rd_url_filter = st.text_input("URL contains...", "", placeholder="ex: /product", label_visibility="collapsed")
-    rd_bot_filter = st.selectbox("Bot", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
-    rd_status_filter = st.selectbox("Status", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+    rd_bot_filter = st.selectbox("Bot (Request details)", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
+    rd_status_filter = st.selectbox("Status (Request details)", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
     
     # Resource type toggles
     col1, col2, col3, col4, col5 = st.columns(5)
