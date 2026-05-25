@@ -245,7 +245,7 @@ def classify_path(path: str) -> str:
 # DB connection
 # ---------------------------------------------------------------------------
 def ensure_database():
-    if DB_PATH.exists():
+    if DB_PATH.exists() and not str(_APP_ROOT).startswith("/mount"):
         return
     if LOCAL_PRIVATE_DB_PATH.exists():
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
