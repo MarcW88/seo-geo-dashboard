@@ -193,13 +193,26 @@ def ensure_database():
         needs_copy = True
     
     if needs_copy:
-        # Copy from private repo
+        # Try to copy from private repo (local)
         if LOCAL_PRIVATE_DB_PATH.exists() and LOCAL_PRIVATE_DB_PATH.stat().st_size > 1000:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(LOCAL_PRIVATE_DB_PATH, DB_PATH)
         else:
-            st.error("Database not found locally.")
-            st.stop()
+            # On Streamlit Cloud, download from GitHub
+            if str(_APP_ROOT).startswith("/mount"):
+                try:
+                    import requests
+                    headers = {"Accept": "application/vnd.github.v3.raw"}
+                    resp = requests.get(PRIVATE_DB_URL, headers=headers, timeout=30)
+                    resp.raise_for_status()
+                    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+                    DB_PATH.write_bytes(resp.content)
+                except Exception as e:
+                    st.error(f"Failed to download database: {e}")
+                    st.stop()
+            else:
+                st.error("Database not found locally.")
+                st.stop()
 
 ensure_database()
 
