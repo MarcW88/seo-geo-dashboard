@@ -89,7 +89,7 @@ def dark_layout(**kwargs):
 # ---------------------------------------------------------------------------
 # Bot identification
 # ---------------------------------------------------------------------------
-_BBOTS = [
+_BOTS = [
     ("googlebot", "Googlebot", "Search engines", False),
     ("google-inspectiontool", "Google Inspection Tool", "Search engines", False),
     ("googleother", "Google Other", "Search engines", False),
