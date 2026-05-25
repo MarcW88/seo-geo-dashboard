@@ -291,6 +291,11 @@ def query(sql: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 
+def table_exists(table_name: str) -> bool:
+    df = query(f"SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = '{table_name}'")
+    return not df.empty and int(df.iloc[0]["n"]) > 0
+
+
 # ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
@@ -309,7 +314,11 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 # Inline filter bar
 # ---------------------------------------------------------------------------
-df_dates = query("SELECT MIN(date) as min_d, MAX(date) as max_d FROM cf_requests_daily")
+HAS_HTTP_LOGS = table_exists("cf_http_requests")
+if HAS_HTTP_LOGS:
+    df_dates = query("SELECT MIN(date) as min_d, MAX(date) as max_d FROM cf_http_requests")
+else:
+    df_dates = query("SELECT MIN(date) as min_d, MAX(date) as max_d FROM cf_requests_daily")
 if not df_dates.empty and df_dates.iloc[0]["min_d"] is not None:
     min_date = pd.to_datetime(df_dates.iloc[0]["min_d"]).date()
     max_date = pd.to_datetime(df_dates.iloc[0]["max_d"]).date()
@@ -361,20 +370,79 @@ RANGE_FILTER = f"date_range_start <= '{end_date}' AND date_range_end >= '{start_
 # ---------------------------------------------------------------------------
 # Load data
 # ---------------------------------------------------------------------------
-df_daily = query(f"SELECT * FROM cf_requests_daily WHERE {DATE_FILTER} ORDER BY date")
+if HAS_HTTP_LOGS:
+    df_daily = query(f"""
+        SELECT
+            date,
+            COUNT(*) AS requests,
+            SUM(edgeresponsebytes) AS bytes,
+            SUM(CASE WHEN LOWER(COALESCE(cachestatus, '')) = 'hit' THEN 1 ELSE 0 END) AS cached_requests,
+            SUM(CASE WHEN LOWER(COALESCE(cachestatus, '')) = 'hit' THEN edgeresponsebytes ELSE 0 END) AS cached_bytes,
+            0 AS threats,
+            COUNT(*) AS page_views,
+            COUNT(DISTINCT clientip) AS uniques
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY date
+        ORDER BY date
+    """)
+    df_paths_raw = query(f"""
+        SELECT clientrequestpath AS path, COUNT(*) AS total
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY clientrequestpath
+        ORDER BY total DESC
+    """)
+    df_ua = query(f"""
+        SELECT clientrequestuseragent AS user_agent, COUNT(*) AS total
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY clientrequestuseragent
+        ORDER BY total DESC
+    """)
+    df_status = query(f"""
+        SELECT edgeresponsestatus AS status_code, COUNT(*) AS total
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY edgeresponsestatus
+        ORDER BY total DESC
+    """)
+    df_cache = query(f"""
+        SELECT cachestatus AS cache_status, COUNT(*) AS total
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY cachestatus
+        ORDER BY total DESC
+    """)
+    df_countries = query(f"""
+        SELECT clientcountry AS country, COUNT(*) AS total
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY clientcountry
+        ORDER BY total DESC
+    """)
+    df_timings = query(f"""
+        SELECT clientrequestpath AS path, AVG(response_time_ms) AS avg_ms, COUNT(*) AS hits
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} AND response_time_ms IS NOT NULL
+        GROUP BY clientrequestpath
+        ORDER BY avg_ms DESC
+    """)
+else:
+    df_daily = query(f"SELECT * FROM cf_requests_daily WHERE {DATE_FILTER} ORDER BY date")
+    df_paths_raw = query(f"SELECT path, SUM(count) as total FROM cf_top_paths WHERE {RANGE_FILTER} GROUP BY path ORDER BY total DESC")
+    df_ua = query(f"SELECT user_agent, SUM(count) as total FROM cf_user_agents WHERE {RANGE_FILTER} GROUP BY user_agent ORDER BY total DESC")
+    df_status = query(f"SELECT status_code, SUM(count) as total FROM cf_status_codes WHERE {RANGE_FILTER} GROUP BY status_code ORDER BY total DESC")
+    df_cache = query(f"SELECT cache_status, SUM(count) as total FROM cf_cache_status WHERE {RANGE_FILTER} GROUP BY cache_status ORDER BY total DESC")
+    df_countries = query(f"SELECT country, SUM(count) as total FROM cf_countries WHERE {RANGE_FILTER} GROUP BY country ORDER BY total DESC")
+    df_timings = query(f"""
+        SELECT path, SUM(avg_response_ms * samples) / SUM(samples) as avg_ms, SUM(samples) as hits
+        FROM cf_path_timings WHERE {RANGE_FILTER} GROUP BY path ORDER BY avg_ms DESC
+    """)
+
 if df_daily.empty:
     st.info("Aucune donnée pour cette période.")
     st.stop()
-
-df_paths_raw = query(f"SELECT path, SUM(count) as total FROM cf_top_paths WHERE {RANGE_FILTER} GROUP BY path ORDER BY total DESC")
-df_ua = query(f"SELECT user_agent, SUM(count) as total FROM cf_user_agents WHERE {RANGE_FILTER} GROUP BY user_agent ORDER BY total DESC")
-df_status = query(f"SELECT status_code, SUM(count) as total FROM cf_status_codes WHERE {RANGE_FILTER} GROUP BY status_code ORDER BY total DESC")
-df_cache = query(f"SELECT cache_status, SUM(count) as total FROM cf_cache_status WHERE {RANGE_FILTER} GROUP BY cache_status ORDER BY total DESC")
-df_countries = query(f"SELECT country, SUM(count) as total FROM cf_countries WHERE {RANGE_FILTER} GROUP BY country ORDER BY total DESC")
-df_timings = query(f"""
-    SELECT path, SUM(avg_response_ms * samples) / SUM(samples) as avg_ms, SUM(samples) as hits
-    FROM cf_path_timings WHERE {RANGE_FILTER} GROUP BY path ORDER BY avg_ms DESC
-""")
 
 # Enrich user agents
 if not df_ua.empty:
