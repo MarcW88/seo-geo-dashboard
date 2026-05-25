@@ -674,6 +674,39 @@ else:
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
+# Section 3.6 — Crawled pages
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Crawled Pages</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    df_crawled = query(f"""
+        SELECT
+            clientrequesturi AS url,
+            clientrequestuseragent AS user_agent,
+            edgeresponsestatus AS status,
+            response_time_ms,
+            edgestarttimestamp AS timestamp
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        ORDER BY edgestarttimestamp DESC
+        LIMIT 500
+    """)
+    if not df_crawled.empty:
+        df_crawled["bot_name"] = df_crawled["user_agent"].apply(lambda ua: extract_bot_info(ua)["name"])
+        df_crawled["bot_category"] = df_crawled["user_agent"].apply(lambda ua: extract_bot_info(ua)["category"])
+        df_crawled["timestamp"] = pd.to_datetime(df_crawled["timestamp"]).dt.strftime("%d/%m/%y %H:%M")
+        df_crawled["response_time_ms"] = df_crawled["response_time_ms"].round(0).astype(int)
+        st.dataframe(
+            df_crawled[["url", "bot_name", "bot_category", "status", "response_time_ms", "timestamp"]]
+            .rename(columns={"url": "URL", "bot_name": "Bot", "bot_category": "Catégorie", "status": "Status", "response_time_ms": "Temps (ms)", "timestamp": "Timestamp"}),
+            use_container_width=True, hide_index=True, height=400,
+        )
+else:
+    st.info("Pages crawlées disponibles avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
 # Section 4 — Status codes + Cache
 # ---------------------------------------------------------------------------
 st.markdown('<div class="section-label">Santé Technique</div>', unsafe_allow_html=True)
