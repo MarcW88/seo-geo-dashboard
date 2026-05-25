@@ -415,19 +415,26 @@ if HAS_HTTP_LOGS:
         df_ua_detail["bot_name"] = _info["name"]
         df_ua_detail["bot_category"] = _info["category"]
         
+        # Show raw user agents for debugging
+        with st.expander("Debug: Raw user agents"):
+            st.dataframe(df_ua_detail[["user_agent", "bot_name", "bot_category", "total"]].head(20), use_container_width=True, hide_index=True)
+        
         bot_detail = (
             df_ua_detail.groupby(["bot_name", "bot_category"])
             .agg({"total": "sum", "unique_urls": "sum", "first_seen": "min", "last_seen": "max"})
             .reset_index().sort_values("total", ascending=False)
         )
-        bot_detail["share_of_total"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(2)
-        bot_detail["first_seen"] = pd.to_datetime(bot_detail["first_seen"]).dt.strftime("%d/%m/%y %H:%M")
-        bot_detail["last_seen"] = pd.to_datetime(bot_detail["last_seen"]).dt.strftime("%d/%m/%y %H:%M")
-        st.dataframe(
-            bot_detail[["bot_name", "bot_category", "total", "share_of_total", "first_seen", "last_seen"]]
-            .rename(columns={"bot_name": "Bot", "bot_category": "Category", "total": "Hits", "share_of_total": "% of total", "first_seen": "First seen", "last_seen": "Last seen"}),
-            use_container_width=True, hide_index=True, height=400,
-        )
+        if not bot_detail.empty:
+            bot_detail["share_of_total"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(2)
+            bot_detail["first_seen"] = pd.to_datetime(bot_detail["first_seen"]).dt.strftime("%d/%m/%y %H:%M")
+            bot_detail["last_seen"] = pd.to_datetime(bot_detail["last_seen"]).dt.strftime("%d/%m/%y %H:%M")
+            st.dataframe(
+                bot_detail[["bot_name", "bot_category", "total", "share_of_total", "first_seen", "last_seen"]]
+                .rename(columns={"bot_name": "Bot", "bot_category": "Category", "total": "Hits", "share_of_total": "% of total", "first_seen": "First seen", "last_seen": "Last seen"}),
+                use_container_width=True, hide_index=True, height=400,
+            )
+        else:
+            st.info("No bot data found for the selected period and filters.")
 else:
     st.info("Bot activity disponible avec les vrais logs Log Explorer.")
 
