@@ -96,36 +96,122 @@ def dark_layout(**kwargs):
 
 
 # ---------------------------------------------------------------------------
-# Bot/UA classification
+# Bot identification
 # ---------------------------------------------------------------------------
-def classify_bot_type(ua: str) -> str:
+_BOTS = [
+    # (keyword, display_name, category, is_dangerous)
+    # Moteurs de recherche
+    ("googlebot",             "Googlebot",               "Moteur de recherche", False),
+    ("google-inspectiontool", "Google Inspection Tool",  "Moteur de recherche", False),
+    ("googleother",           "Google Other",            "Moteur de recherche", False),
+    ("adsbot-google",         "Google AdsBot",           "Moteur de recherche", False),
+    ("mediapartners-google",  "Google Mediapartners",    "Moteur de recherche", False),
+    ("bingbot",               "Bingbot",                 "Moteur de recherche", False),
+    ("bingpreview",           "Bing Preview",            "Moteur de recherche", False),
+    ("msnbot",                "MSNBot",                  "Moteur de recherche", False),
+    ("adidxbot",              "Bing AdIdxBot",           "Moteur de recherche", False),
+    ("duckduckbot",           "DuckDuckBot",             "Moteur de recherche", False),
+    ("yandexbot",             "YandexBot",               "Moteur de recherche", False),
+    ("yandex.com/bots",       "YandexBot",               "Moteur de recherche", False),
+    ("baiduspider",           "Baidu Spider",            "Moteur de recherche", False),
+    ("applebot",              "Applebot",                "Moteur de recherche", False),
+    ("sogou",                 "Sogou Spider",            "Moteur de recherche", False),
+    ("naverbot",              "NaverBot",                "Moteur de recherche", False),
+    # IA
+    ("gptbot",                "GPTBot (OpenAI)",         "IA Bot", False),
+    ("chatgpt-user",          "ChatGPT User (OpenAI)",   "IA Bot", False),
+    ("oai-searchbot",         "OAI SearchBot (OpenAI)",  "IA Bot", False),
+    ("claudebot",             "ClaudeBot (Anthropic)",   "IA Bot", False),
+    ("claude-web",            "Claude Web (Anthropic)",  "IA Bot", False),
+    ("anthropic",             "Anthropic Bot",           "IA Bot", False),
+    ("google-extended",       "Google-Extended (Gemini)","IA Bot", False),
+    ("perplexitybot",         "PerplexityBot",           "IA Bot", False),
+    ("cohere",                "Cohere AI Bot",           "IA Bot", False),
+    ("meta-externalagent",    "Meta AI Bot",             "IA Bot", False),
+    ("amazonbot",             "AmazonBot (Alexa AI)",    "IA Bot", False),
+    ("bytespider",            "ByteSpider (TikTok AI)",  "IA Bot", False),
+    ("diffbot",               "DiffBot",                 "IA Bot", False),
+    ("facebookbot",           "FacebookBot (Meta AI)",   "IA Bot", False),
+    # SEO
+    ("ahrefsbot",             "AhrefsBot",               "SEO Tool", False),
+    ("semrushbot",            "SEMrushBot",              "SEO Tool", False),
+    ("mj12bot",               "Majestic MJ12Bot",        "SEO Tool", False),
+    ("dotbot",                "OpenLinkProfiler DotBot", "SEO Tool", False),
+    ("blexbot",               "BLEXBot",                 "SEO Tool", False),
+    ("sitebulb",              "Sitebulb",                "SEO Tool", False),
+    ("serpstatbot",           "SerpstatBot",             "SEO Tool", False),
+    ("rogerbot",              "Moz Rogerbot",            "SEO Tool", False),
+    ("seolyt",                "SeoLyt",                  "SEO Tool", False),
+    ("seokicks",              "SEOkicks",                "SEO Tool", False),
+    # Social
+    ("facebookexternalhit",   "Facebook Crawler",        "Social", False),
+    ("facebot",               "Facebot (Facebook)",      "Social", False),
+    ("twitterbot",            "TwitterBot",              "Social", False),
+    ("linkedinbot",           "LinkedInBot",             "Social", False),
+    ("pinterestbot",          "PinterestBot",            "Social", False),
+    ("slackbot",              "Slackbot",                "Social", False),
+    ("whatsapp",              "WhatsApp Preview",        "Social", False),
+    ("telegrambot",           "TelegramBot",             "Social", False),
+    ("discordbot",            "DiscordBot",              "Social", False),
+    # Scanners dangereux
+    ("l9scan",                "LeakIX Scanner",          "Scanner", True),
+    ("leakix",                "LeakIX Scanner",          "Scanner", True),
+    ("shodan",                "Shodan",                  "Scanner", True),
+    ("censys",                "Censys",                  "Scanner", True),
+    ("masscan",               "Masscan",                 "Scanner", True),
+    ("zgrab",                 "ZGrab",                   "Scanner", True),
+    ("nuclei",                "Nuclei",                  "Scanner", True),
+    ("nikto",                 "Nikto",                   "Scanner", True),
+    ("sqlmap",                "SQLMap",                  "Scanner", True),
+    ("nmap",                  "Nmap",                    "Scanner", True),
+    ("acunetix",              "Acunetix",                "Scanner", True),
+    ("burpsuite",             "Burp Suite",              "Scanner", True),
+    ("dirbuster",             "DirBuster",               "Scanner", True),
+    ("gobuster",              "GoBuster",                "Scanner", True),
+    ("wfuzz",                 "WFuzz",                   "Scanner", True),
+    ("nessus",                "Nessus",                  "Scanner", True),
+    ("skipfish",              "Skipfish",                "Scanner", True),
+    ("w3af",                  "W3AF",                    "Scanner", True),
+    # Scripts / HTTP clients
+    ("python-requests",       "Python Requests",         "Script", False),
+    ("axios",                 "Axios",                   "Script", False),
+    ("curl/",                 "cURL",                    "Script", False),
+    ("wget/",                 "Wget",                    "Script", False),
+    ("go-http-client",        "Go HTTP Client",          "Script", False),
+    ("java/",                 "Java HTTP",               "Script", False),
+    ("okhttp",                "OkHttp",                  "Script", False),
+    ("scrapy",                "Scrapy",                  "Script", False),
+    ("libwww-perl",           "Perl LWP",                "Script", False),
+    ("headlesschrome",        "Headless Chrome",         "Script", False),
+]
+
+
+def extract_bot_info(ua: str) -> dict:
     u = (ua or "").lower()
-    if any(k in u for k in ["gptbot", "chatgpt", "openai", "gpt-", "claude", "anthropic", "perplexitybot", "cohere", "meta-externalagent", "amazonbot"]):
-        return "AI Bot"
-    if any(k in u for k in ["googlebot", "google-inspectiontool", "googleother", "adsbot-google", "mediapartners-google"]):
-        return "Google"
-    if any(k in u for k in ["bingbot", "bingpreview", "msnbot", "adidxbot"]):
-        return "Bing"
-    if any(k in u for k in ["ahrefsbot", "semrushbot", "mj12bot", "dotbot", "blexbot", "sitebulb", "screaming"]):
-        return "SEO Tool"
-    if any(k in u for k in ["facebookexternalhit", "facebot", "twitterbot", "linkedinbot", "pinterestbot", "slackbot", "whatsapp", "telegrambot"]):
-        return "Social"
-    if any(k in u for k in ["yandexbot", "baiduspider", "duckduckbot", "applebot", "sogou"]):
-        return "Other Search"
-    if any(k in u for k in ["bot", "crawl", "spider", "slurp", "fetcher", "checker", "monitor", "scan"]):
-        return "Other Bot"
-    return "Human"
+    for keyword, name, category, dangerous in _BOTS:
+        if keyword in u:
+            return {"name": name, "category": category, "dangerous": dangerous}
+    if any(k in u for k in ["bot", "crawl", "spider", "slurp", "fetcher"]):
+        words = [w for w in (ua or "").split() if len(w) > 3]
+        raw = words[0][:40] if words else "Bot inconnu"
+        return {"name": raw, "category": "Bot inconnu", "dangerous": False}
+    if any(k in u for k in ["iphone", "android", "mobile"]):
+        return {"name": "Navigateur mobile", "category": "Humain", "dangerous": False}
+    if any(k in u for k in ["mozilla", "chrome", "firefox", "safari", "edge"]):
+        return {"name": "Navigateur desktop", "category": "Humain", "dangerous": False}
+    return {"name": (ua or "Inconnu")[:50], "category": "Inconnu", "dangerous": False}
 
 
 BOT_COLORS = {
-    "Google": "#4285f4",
-    "Bing": "#00b4d8",
-    "AI Bot": "#f59e0b",
-    "SEO Tool": "#a855f7",
-    "Social": "#ec4899",
-    "Other Search": "#10b981",
-    "Other Bot": "#6b7280",
-    "Human": "#38bdf8",
+    "Moteur de recherche": "#4285f4",
+    "IA Bot":              "#f59e0b",
+    "SEO Tool":            "#a855f7",
+    "Social":              "#ec4899",
+    "Scanner":             "#ef4444",
+    "Script":              "#6b7280",
+    "Bot inconnu":         "#475569",
+    "Humain":              "#38bdf8",
+    "Inconnu":             "#334155",
 }
 
 
@@ -285,11 +371,14 @@ df_timings = query(f"""
 
 # Enrich user agents
 if not df_ua.empty:
-    df_ua["bot_type"] = df_ua["user_agent"].apply(classify_bot_type)
+    _info = df_ua["user_agent"].apply(lambda ua: pd.Series(extract_bot_info(ua)))
+    df_ua["bot_name"]     = _info["name"]
+    df_ua["bot_category"] = _info["category"]
+    df_ua["dangerous"]    = _info["dangerous"]
     if traffic_filter == "Bots/UA suspects":
-        df_ua = df_ua[df_ua["bot_type"] != "Human"]
+        df_ua = df_ua[df_ua["bot_category"] != "Humain"]
     elif traffic_filter == "Humains probables":
-        df_ua = df_ua[df_ua["bot_type"] == "Human"]
+        df_ua = df_ua[df_ua["bot_category"] == "Humain"]
 
 # Enrich paths
 if not df_paths_raw.empty:
@@ -308,7 +397,7 @@ else:
 total_req = int(df_daily["requests"].sum())
 total_cached = int(df_daily["cached_requests"].sum())
 cache_pct = total_cached / total_req * 100 if total_req else 0
-bot_hits = int(df_ua[df_ua["bot_type"] != "Human"]["total"].sum()) if not df_ua.empty else 0
+bot_hits = int(df_ua[df_ua["bot_category"] != "Humain"]["total"].sum()) if not df_ua.empty else 0
 error_hits = int(df_status[df_status["status_code"] >= 400]["total"].sum()) if not df_status.empty else 0
 error_pct = error_hits / total_req * 100 if total_req else 0
 avg_ms = round(df_timings["avg_ms"].mean(), 0) if not df_timings.empty else None
@@ -351,29 +440,34 @@ b_left, b_mid, b_right = st.columns([1, 1, 2])
 
 with b_left:
     if not df_ua.empty:
-        bot_summary = df_ua.groupby("bot_type")["total"].sum().reset_index().sort_values("total", ascending=False)
-        colors = [BOT_COLORS.get(t, "#6b7280") for t in bot_summary["bot_type"]]
-        fig = px.pie(bot_summary, values="total", names="bot_type", color="bot_type",
+        bot_cat = df_ua.groupby("bot_category")["total"].sum().reset_index().sort_values("total", ascending=False)
+        fig = px.pie(bot_cat, values="total", names="bot_category", color="bot_category",
                      color_discrete_map=BOT_COLORS, hole=0.55)
-        fig.update_layout(**dark_layout(height=280, showlegend=False, margin=dict(l=0, r=0, t=0, b=0)))
-        fig.update_traces(textposition="outside", textinfo="percent+label", textfont_size=11)
+        fig.update_layout(**dark_layout(height=300, showlegend=True, margin=dict(l=0, r=0, t=0, b=0),
+                                         legend=dict(orientation="v", font=dict(size=11))))
+        fig.update_traces(textposition="inside", textinfo="percent", textfont_size=11)
         st.plotly_chart(fig, use_container_width=True)
 
 with b_mid:
     if not df_ua.empty:
-        bot_summary2 = df_ua.groupby("bot_type")["total"].sum().reset_index().sort_values("total", ascending=False)
-        fig = px.bar(bot_summary2, x="total", y="bot_type", orientation="h",
-                     color="bot_type", color_discrete_map=BOT_COLORS)
-        fig.update_layout(**dark_layout(height=280, showlegend=False, yaxis=dict(autorange="reversed", tickfont=dict(size=11))))
+        bot_cat2 = df_ua.groupby("bot_category")["total"].sum().reset_index().sort_values("total")
+        fig = px.bar(bot_cat2, x="total", y="bot_category", orientation="h",
+                     color="bot_category", color_discrete_map=BOT_COLORS)
+        fig.update_layout(**dark_layout(height=300, showlegend=False, yaxis=dict(tickfont=dict(size=11))))
         st.plotly_chart(fig, use_container_width=True)
 
 with b_right:
     if not df_ua.empty:
-        df_ua_disp = df_ua.copy()
-        df_ua_disp["user_agent"] = df_ua_disp["user_agent"].str[:80]
+        bot_detail = (
+            df_ua.groupby(["bot_name", "bot_category", "dangerous"])["total"]
+            .sum().reset_index().sort_values("total", ascending=False)
+        )
+        bot_detail["danger"] = bot_detail["dangerous"].apply(lambda d: "\U0001f534" if d else "")
+        bot_detail["share %"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(1)
         st.dataframe(
-            df_ua_disp[["bot_type", "user_agent", "total"]].rename(columns={"bot_type": "type", "user_agent": "user-agent", "total": "hits"}),
-            use_container_width=True, hide_index=True, height=280,
+            bot_detail[["danger", "bot_name", "bot_category", "total", "share %"]]
+            .rename(columns={"bot_name": "Bot", "bot_category": "Cat\u00e9gorie", "total": "Hits", "danger": "\u26a0"}),
+            use_container_width=True, hide_index=True, height=300,
         )
 
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
