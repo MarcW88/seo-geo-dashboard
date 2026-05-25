@@ -1,5 +1,5 @@
 """
-dashboard.py — Log Analyzer Dashboard (Log Explorer only)
+dashboard.py — Log Analyzer Dashboard (6 views)
 
 Usage:
     streamlit run src/dashboard.py
@@ -68,6 +68,13 @@ section[data-testid="stSidebar"] { display: none !important; }
     border-bottom: 1px solid #1e293b;
     margin-bottom: 12px;
 }
+.filter-bar {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 1rem 1.5rem;
+    margin-bottom: 1.5rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -122,14 +129,14 @@ _BOTS = [
     ("ccbot", "CCBot (Common Crawl)", "AI bots", False),
     ("ia_archiver", "Wayback Machine (Archive.org)", "AI bots", False),
     ("archive.org_bot", "archive.org_bot", "AI bots", False),
-    ("ahrefsbot", "Ahrefsbot", "Other bots", False),
-    ("semrushbot", "SEMrushbot", "Other bots", False),
-    ("mj12bot", "Majestic MJ12Bot", "Other bots", False),
-    ("dotbot", "DotBot", "Other bots", False),
-    ("blexbot", "BLEXBot", "Other bots", False),
-    ("sitebulb", "Sitebulb", "Other bots", False),
-    ("serpstatbot", "SerpstatBot", "Other bots", False),
-    ("rogerbot", "Moz Rogerbot", "Other bots", False),
+    ("ahrefsbot", "Ahrefsbot", "SEO tools", False),
+    ("semrushbot", "SEMrushbot", "SEO tools", False),
+    ("mj12bot", "Majestic MJ12Bot", "SEO tools", False),
+    ("dotbot", "DotBot", "SEO tools", False),
+    ("blexbot", "BLEXBot", "SEO tools", False),
+    ("sitebulb", "Sitebulb", "SEO tools", False),
+    ("serpstatbot", "SerpstatBot", "SEO tools", False),
+    ("rogerbot", "Moz Rogerbot", "SEO tools", False),
     ("facebookexternalhit", "Facebook External Hit", "Social networks", False),
     ("facebot", "Facebot (Facebook)", "Social networks", False),
     ("twitterbot", "TwitterBot", "Social networks", False),
@@ -156,23 +163,25 @@ def extract_bot_info(ua: str) -> dict:
 def classify_path(path: str) -> str:
     p = (path or "").lower()
     if p.endswith((".css", ".js")):
-        return "Asset"
+        return "CSS/JS"
     elif p.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp")):
-        return "Asset"
+        return "Images"
     elif p.endswith((".woff", ".woff2", ".ttf", ".eot")):
-        return "Asset"
+        return "Fonts"
     elif p.endswith(".xml"):
-        return "Sitemap"
+        return "XML"
     elif "/api/" in p or p.startswith("/api"):
         return "API"
     elif "/admin" in p or "/kentico" in p.lower():
         return "Admin"
+    elif p.endswith((".html", ".htm")) or "?" in p:
+        return "HTML"
     elif p in ("/", "/fr", "/en", "/nl"):
-        return "Page"
+        return "HTML"
     elif p.startswith(("/fr/", "/en/", "/nl/")):
-        return "Page"
+        return "HTML"
     else:
-        return "Autre"
+        return "Other"
 
 # ---------------------------------------------------------------------------
 # DB connection (original logic)
@@ -241,7 +250,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Date filter
+# GlobalFiltersBar
 # ---------------------------------------------------------------------------
 HAS_HTTP_LOGS = table_exists("cf_http_requests")
 if HAS_HTTP_LOGS:
@@ -254,18 +263,6 @@ if not df_dates.empty and df_dates.iloc[0]["min_d"] is not None:
 else:
     min_date = max_date = None
 
-with st.container():
-    fc1 = st.columns([1])[0]
-    with fc1:
-        if min_date:
-            date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
-            start_date, end_date = (date_range if isinstance(date_range, tuple) and len(date_range) == 2 else (min_date, max_date))
-        else:
-            start_date = end_date = None
-
-# ---------------------------------------------------------------------------
-# No data guard
-# ---------------------------------------------------------------------------
 if start_date is None:
     st.markdown("## Pas encore de données")
     db_exists = DB_PATH.exists()
@@ -287,44 +284,114 @@ if start_date is None:
             st.warning("Token présent mais DB non téléchargée. Vérifie les permissions (Contents: Read).")
     st.stop()
 
+with st.container():
+    fc1, fc2, fc3 = st.columns([2, 1, 1])
+    with fc1:
+        if min_date:
+            date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
+            start_date, end_date = (date_range if isinstance(date_range, tuple) and len(date_range) == 2 else (min_date, max_date))
+        else:
+            start_date = end_date = None
+    with fc2:
+        bot_filter = st.selectbox("Bot filter", ["All", "Only bots", "Only users"], label_visibility="collapsed")
+    with fc3:
+        status_filter = st.selectbox("Status filter", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+
 DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
 
+# Build SQL filters
+bot_filter_sql = ""
+if bot_filter == "Only bots":
+    bot_filter_sql = "AND LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%'"
+elif bot_filter == "Only users":
+    bot_filter_sql = "AND LOWER(clientrequestuseragent) NOT LIKE '%bot%' AND LOWER(clientrequestuseragent) NOT LIKE '%crawler%' AND LOWER(clientrequestuseragent) NOT LIKE '%spider%'"
+
+status_filter_sql = ""
+if status_filter != "All":
+    if status_filter == "2xx":
+        status_filter_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
+    elif status_filter == "3xx":
+        status_filter_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
+    elif status_filter == "4xx":
+        status_filter_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
+    elif status_filter == "5xx":
+        status_filter_sql = "AND edgeresponsestatus >= 500 AND edgeresponsestatus < 600"
+
 # ---------------------------------------------------------------------------
-# Section 1 — Request Distribution
+# View 1: Vue globale (Header + KPIs)
 # ---------------------------------------------------------------------------
-st.markdown('<div class="section-label">Request Distribution</div>', unsafe_allow_html=True)
+st.markdown('<div class="section-label">Vue globale</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    df_kpi = query(f"""
+    # Total requests
+    df_total = query(f"""
         SELECT
-            COUNT(*) AS total_requests,
-            COUNT(DISTINCT clientrequesturi) AS unique_urls,
-            COUNT(DISTINCT clientrequestuseragent) AS unique_ua
+            COUNT(*) AS total_hits,
+            COUNT(DISTINCT clientrequesturi) AS unique_urls
         FROM cf_http_requests
-        WHERE {DATE_FILTER}
+        WHERE {DATE_FILTER} {bot_filter_sql} {status_filter_sql}
     """).iloc[0]
-
-    df_bots = query(f"""
-        SELECT COUNT(*) AS bot_count
+    
+    # User vs Bot split
+    df_split = query(f"""
+        SELECT
+            CASE 
+                WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
+                THEN 'bot' 
+                ELSE 'user' 
+            END AS type,
+            COUNT(*) AS hits
         FROM cf_http_requests
-        WHERE {DATE_FILTER}
-        AND LOWER(clientrequestuseragent) NOT LIKE '%bot%'
-        AND LOWER(clientrequestuseragent) NOT LIKE '%crawler%'
-        AND LOWER(clientrequestuseragent) NOT LIKE '%spider%'
+        WHERE {DATE_FILTER} {status_filter_sql}
+        GROUP BY type
+    """)
+    
+    user_hits = 0
+    bot_hits = 0
+    if not df_split.empty:
+        user_hits = int(df_split[df_split["type"] == "user"]["hits"].sum())
+        bot_hits = int(df_split[df_split["type"] == "bot"]["hits"].sum())
+    
+    # Bots detected
+    df_bots_detected = query(f"""
+        SELECT COUNT(DISTINCT clientrequestuseragent) AS bots_detected
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} 
+        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
     """).iloc[0]
-
+    
+    # Status codes
+    df_status = query(f"""
+        SELECT
+            CASE 
+                WHEN edgeresponsestatus >= 200 AND edgeresponsestatus < 300 THEN '2xx'
+                WHEN edgeresponsestatus >= 300 AND edgeresponsestatus < 400 THEN '3xx'
+                WHEN edgeresponsestatus >= 400 AND edgeresponsestatus < 500 THEN '4xx'
+                WHEN edgeresponsestatus >= 500 AND edgeresponsestatus < 600 THEN '5xx'
+                ELSE 'other'
+            END AS status_group,
+            COUNT(*) AS hits
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} {bot_filter_sql}
+        GROUP BY status_group
+    """)
+    
     k1, k2, k3, k4 = st.columns(4)
-    k1.metric("Total requests", f"{int(df_kpi['total_requests']):,}")
-    k2.metric("Unique URLs", f"{int(df_kpi['unique_urls']):,}")
-    k3.metric("Bots detected", f"{int(df_bots['bot_count']):,}")
-    k4.metric("Unique user agents", f"{int(df_kpi['unique_ua']):,}")
-else:
-    st.info("Request distribution disponible avec les vrais logs Log Explorer.")
+    
+    total_hits = int(df_total["total_hits"])
+    k1.metric("Total requests", f"{total_hits:,}", 
+              help=f"Users: {user_hits:,} ({user_hits/total_hits*100:.1f}%), Bots: {bot_hits:,} ({bot_hits/total_hits*100:.1f}%)")
+    k2.metric("Unique URLs", f"{int(df_total['unique_urls']):,}")
+    k3.metric("Bots detected", f"{int(df_bots_detected['bots_detected']):,}")
+    
+    # Status codes as clickable badges
+    status_text = " | ".join([f"{row['status_group']}: {row['hits']:,}" for _, row in df_status.iterrows()])
+    k4.metric("Response codes", status_text if not df_status.empty else "—")
 
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Section 2 — Bot activity
+# View 2: Bot activity
 # ---------------------------------------------------------------------------
 st.markdown('<div class="section-label">Bot activity</div>', unsafe_allow_html=True)
 
@@ -334,10 +401,11 @@ if HAS_HTTP_LOGS:
             clientrequestuseragent AS user_agent,
             COUNT(*) AS total,
             COUNT(DISTINCT clientrequesturi) AS unique_urls,
-            MIN(edgestarttimestamp) AS first_visit,
-            MAX(edgestarttimestamp) AS last_visit
+            MIN(edgestarttimestamp) AS first_seen,
+            MAX(edgestarttimestamp) AS last_seen
         FROM cf_http_requests
-        WHERE {DATE_FILTER}
+        WHERE {DATE_FILTER} {status_filter_sql}
+        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
         GROUP BY clientrequestuseragent
         ORDER BY total DESC
     """)
@@ -346,20 +414,18 @@ if HAS_HTTP_LOGS:
         _info = df_ua_detail["user_agent"].apply(lambda ua: pd.Series(extract_bot_info(ua)))
         df_ua_detail["bot_name"] = _info["name"]
         df_ua_detail["bot_category"] = _info["category"]
-        df_ua_detail["dangerous"] = _info["dangerous"]
         
         bot_detail = (
-            df_ua_detail.groupby(["bot_name", "bot_category", "dangerous"])
-            .agg({"total": "sum", "unique_urls": "sum", "first_visit": "min", "last_visit": "max"})
+            df_ua_detail.groupby(["bot_name", "bot_category"])
+            .agg({"total": "sum", "unique_urls": "sum", "first_seen": "min", "last_seen": "max"})
             .reset_index().sort_values("total", ascending=False)
         )
-        bot_detail["danger"] = bot_detail["dangerous"].apply(lambda d: "\U0001f534" if d else "")
-        bot_detail["share %"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(1)
-        bot_detail["first_visit"] = pd.to_datetime(bot_detail["first_visit"]).dt.strftime("%d/%m/%y %H:%M")
-        bot_detail["last_visit"] = pd.to_datetime(bot_detail["last_visit"]).dt.strftime("%d/%m/%y %H:%M")
+        bot_detail["share_of_total"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(2)
+        bot_detail["first_seen"] = pd.to_datetime(bot_detail["first_seen"]).dt.strftime("%d/%m/%y %H:%M")
+        bot_detail["last_seen"] = pd.to_datetime(bot_detail["last_seen"]).dt.strftime("%d/%m/%y %H:%M")
         st.dataframe(
-            bot_detail[["danger", "bot_name", "bot_category", "total", "unique_urls", "share %", "first_visit", "last_visit"]]
-            .rename(columns={"bot_name": "Bot", "bot_category": "Catégorie", "total": "Requests", "unique_urls": "URLs uniques", "danger": "⚠", "first_visit": "Première visite", "last_visit": "Dernière visite"}),
+            bot_detail[["bot_name", "bot_category", "total", "share_of_total", "first_seen", "last_seen"]]
+            .rename(columns={"bot_name": "Bot", "bot_category": "Category", "total": "Hits", "share_of_total": "% of total", "first_seen": "First seen", "last_seen": "Last seen"}),
             use_container_width=True, hide_index=True, height=400,
         )
 else:
@@ -368,43 +434,239 @@ else:
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
-# Section 3 — Request details
+# View 3: Crawl timeline
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Crawl timeline</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    group_by = st.selectbox("Group by", ["day", "week"], label_visibility="collapsed")
+    
+    if group_by == "day":
+        df_timeline = query(f"""
+            SELECT
+                DATE(edgestarttimestamp) AS date,
+                CASE 
+                    WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
+                    THEN 'Bot' 
+                    ELSE 'User' 
+                END AS type,
+                COUNT(*) AS hits
+            FROM cf_http_requests
+            WHERE {DATE_FILTER} {status_filter_sql}
+            GROUP BY DATE(edgestarttimestamp), type
+            ORDER BY date
+        """)
+    else:
+        df_timeline = query(f"""
+            SELECT
+                DATE_TRUNC('week', edgestarttimestamp) AS date,
+                CASE 
+                    WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
+                    THEN 'Bot' 
+                    ELSE 'User' 
+                END AS type,
+                COUNT(*) AS hits
+            FROM cf_http_requests
+            WHERE {DATE_FILTER} {status_filter_sql}
+            GROUP BY DATE_TRUNC('week', edgestarttimestamp), type
+            ORDER BY date
+        """)
+    
+    if not df_timeline.empty:
+        df_timeline["date"] = pd.to_datetime(df_timeline["date"])
+        fig = px.bar(df_timeline, x="date", y="hits", color="type",
+                     color_discrete_map={"User": "#38bdf8", "Bot": "#f59e0b"},
+                     labels={"hits": "Hits", "type": "Type"})
+        fig.update_layout(**dark_layout(height=300, title=None, xaxis_title="Date", yaxis_title="Hits",
+                                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)))
+        st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("Crawl timeline disponible avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# View 4: Statistics by page category
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Statistics by page category</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    category_search = st.text_input("Search category...", "", placeholder="ex: /fr, /en", label_visibility="collapsed")
+    file_type_filter = st.selectbox("File type", ["All", "HTML", "CSS/JS", "Images", "XML", "Fonts", "Other"], label_visibility="collapsed")
+    
+    file_filter_sql = ""
+    if file_type_filter != "All":
+        if file_type_filter == "HTML":
+            file_filter_sql = "AND (clientrequestpath LIKE '%.html' OR clientrequestpath LIKE '%.htm' OR clientrequestpath LIKE '?' OR clientrequestpath IN ('/', '/fr', '/en', '/nl') OR clientrequestpath LIKE '/fr/%' OR clientrequestpath LIKE '/en/%' OR clientrequestpath LIKE '/nl/%')"
+        elif file_type_filter == "CSS/JS":
+            file_filter_sql = "AND (clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')"
+        elif file_type_filter == "Images":
+            file_filter_sql = "AND (clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR clientrequestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')"
+        elif file_type_filter == "XML":
+            file_filter_sql = "AND clientrequestpath LIKE '%.xml'"
+        elif file_type_filter == "Fonts":
+            file_filter_sql = "AND (clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR client_requestpath LIKE '%.eot')"
+    
+    category_filter_sql = ""
+    if category_search:
+        category_filter_sql = f"AND clientrequestpath LIKE '%{category_search}%'"
+    
+    df_category = query(f"""
+        SELECT
+            clientrequestpath AS path,
+            COUNT(*) AS total_hits,
+            COUNT(DISTINCT clientrequestpath) AS unique_urls,
+            AVG(response_time_ms) AS avg_duration_ms
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} {bot_filter_sql} {status_filter_sql} {file_filter_sql} {category_filter_sql}
+        GROUP BY clientrequestpath
+        ORDER BY total_hits DESC
+        LIMIT 100
+    """)
+    
+    if not df_category.empty:
+        df_category["category"] = df_category["path"].apply(lambda p: "/".join(p.split("/")[:2]) if p.count("/") > 0 else p)
+        df_category_summary = df_category.groupby("category").agg(
+            total_hits=("total_hits", "sum"),
+            unique_urls=("unique_urls", "sum"),
+            avg_duration_ms=("avg_duration_ms", "mean")
+        ).reset_index().sort_values("total_hits", ascending=False)
+        df_category_summary["hits_per_day"] = (df_category_summary["total_hits"] / (df_dates.iloc[0]["max_d"] - df_dates.iloc[0]["min_d"]).days if not df_dates.empty else 1).round(2)
+        df_category_summary["avg_duration_ms"] = df_category_summary["avg_duration_ms"].round(0).astype(int)
+        st.dataframe(
+            df_category_summary[["category", "total_hits", "unique_urls", "hits_per_day", "avg_duration_ms"]]
+            .rename(columns={"category": "Category", "total_hits": "Total hits", "unique_urls": "Unique URLs", "hits_per_day": "Hits/day", "avg_duration_ms": "Avg duration (ms)"}),
+            use_container_width=True, hide_index=True, height=300,
+        )
+else:
+    st.info("Statistics by page category disponibles avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# View 5: Crawled pages
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Crawled pages</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    url_filter = st.text_input("Filter by URL...", "", placeholder="ex: /en/shoes", label_visibility="collapsed")
+    bot_specific_filter = st.selectbox("Bot", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
+    
+    bot_specific_filter_sql = ""
+    if bot_specific_filter != "All":
+        bot_specific_filter_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{bot_specific_filter.lower()}%'"
+    
+    url_filter_sql = ""
+    if url_filter:
+        url_filter_sql = f"AND clientrequesturi LIKE '%{url_filter}%'"
+    
+    df_crawled = query(f"""
+        SELECT
+            clientrequesturi AS url,
+            COUNT(*) AS total_hits,
+            COUNT(DISTINCT clientrequestuseragent) AS unique_bots,
+            MAX(edgestarttimestamp) AS last_crawl
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} {status_filter_sql} {bot_specific_filter_sql} {url_filter_sql}
+        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
+        GROUP BY clientrequesturi
+        ORDER BY last_crawl DESC
+        LIMIT 100
+    """)
+    
+    if not df_crawled.empty:
+        df_crawled["last_crawl"] = pd.to_datetime(df_crawled["last_crawl"]).dt.strftime("%d/%m/%y %H:%M")
+        st.dataframe(
+            df_crawled[["url", "total_hits", "unique_bots", "last_crawl"]]
+            .rename(columns={"url": "URL", "total_hits": "Total hits", "unique_bots": "Unique bots", "last_crawl": "Last crawl"}),
+            use_container_width=True, hide_index=True, height=400,
+        )
+else:
+    st.info("Crawled pages disponibles avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
+# View 6: Request details
 # ---------------------------------------------------------------------------
 st.markdown('<div class="section-label">Request details</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    content_type_filter = st.selectbox(
-        "Filtrer par type de contenu",
-        ["Tous", "Page", "Asset", "API", "Admin", "Sitemap", "Autre"],
-        index=0
-    )
-
+    rd_url_filter = st.text_input("URL contains...", "", placeholder="ex: /product", label_visibility="collapsed")
+    rd_bot_filter = st.selectbox("Bot", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
+    rd_status_filter = st.selectbox("Status", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+    
+    # Resource type toggles
+    col1, col2, col3, col4, col5 = st.columns(5)
+    with col1:
+        toggle_html = st.checkbox("HTML", value=True)
+    with col2:
+        toggle_cssjs = st.checkbox("CSS/JS", value=False)
+    with col3:
+        toggle_images = st.checkbox("Images", value=False)
+    with col4:
+        toggle_xml = st.checkbox("XML", value=False)
+    with col5:
+        toggle_fonts = st.checkbox("Fonts", value=False)
+    
+    rd_bot_filter_sql = ""
+    if rd_bot_filter != "All":
+        rd_bot_filter_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{rd_bot_filter.lower()}%'"
+    
+    rd_status_filter_sql = ""
+    if rd_status_filter != "All":
+        if rd_status_filter == "2xx":
+            rd_status_filter_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
+        elif rd_status_filter == "3xx":
+            rd_status_filter_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
+        elif rd_status_filter == "4xx":
+            rd_status_filter_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
+        elif rd_status_filter == "5xx":
+            rd_status_filter_sql = "AND edgeresponsestatus >= 500 AND edgeresponsestatus < 600"
+    
+    rd_url_filter_sql = ""
+    if rd_url_filter:
+        rd_url_filter_sql = f"AND clientrequesturi LIKE '%{rd_url_filter}%'"
+    
+    # Build resource type filter
+    resource_filters = []
+    if toggle_html:
+        resource_filters.append("(clientrequestpath LIKE '%.html' OR clientrequestpath LIKE '%.htm' OR clientrequestpath LIKE '?' OR clientrequestpath IN ('/', '/fr', '/en', '/nl') OR clientrequestpath LIKE '/fr/%' OR clientrequestpath LIKE '/en/%' OR clientrequestpath LIKE '/nl/%')")
+    if toggle_cssjs:
+        resource_filters.append("(clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')")
+    if toggle_images:
+        resource_filters.append("(clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR client_requestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')")
+    if toggle_xml:
+        resource_filters.append("clientrequestpath LIKE '%.xml'")
+    if toggle_fonts:
+        resource_filters.append("(clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR clientrequestpath LIKE '%.eot')")
+    
+    rd_resource_filter_sql = ""
+    if resource_filters:
+        rd_resource_filter_sql = "AND (" + " OR ".join(resource_filters) + ")"
+    
     df_requests = query(f"""
         SELECT
+            edgestarttimestamp AS datetime,
             clientrequesturi AS url,
             clientrequestuseragent AS user_agent,
-            edgeresponsestatus AS status,
-            response_time_ms,
-            edgestarttimestamp AS timestamp
+            edgeresponsestatus AS status_code,
+            response_time_ms AS duration_ms
         FROM cf_http_requests
-        WHERE {DATE_FILTER}
+        WHERE {DATE_FILTER} {rd_bot_filter_sql} {rd_status_filter_sql} {rd_url_filter_sql} {rd_resource_filter_sql}
         ORDER BY edgestarttimestamp DESC
         LIMIT 1000
     """)
+    
     if not df_requests.empty:
-        df_requests["bot_name"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["name"])
-        df_requests["bot_category"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["category"])
-        df_requests["content_type"] = df_requests["url"].apply(classify_path)
-        df_requests["timestamp"] = pd.to_datetime(df_requests["timestamp"]).dt.strftime("%d/%m/%y %H:%M")
-        df_requests["response_time_ms"] = df_requests["response_time_ms"].round(0).astype(int)
-
-        if content_type_filter != "Tous":
-            df_requests = df_requests[df_requests["content_type"] == content_type_filter]
-
+        df_requests["datetime"] = pd.to_datetime(df_requests["datetime"]).dt.strftime("%d/%m/%y %H:%M")
+        df_requests["bot"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["name"])
+        df_requests["category"] = df_requests["url"].apply(classify_path)
+        df_requests["duration_ms"] = df_requests["duration_ms"].round(0).astype(int)
         st.dataframe(
-            df_requests[["url", "bot_name", "bot_category", "content_type", "status", "response_time_ms", "timestamp"]]
-            .rename(columns={"url": "URL", "bot_name": "Bot", "bot_category": "Catégorie", "content_type": "Type", "status": "Status", "response_time_ms": "Temps (ms)", "timestamp": "Timestamp"}),
+            df_requests[["datetime", "url", "bot", "category", "status_code", "duration_ms"]]
+            .rename(columns={"datetime": "Date/Time", "url": "URL", "bot": "Bot", "category": "Category", "status_code": "Status", "duration_ms": "Duration (ms)"}),
             use_container_width=True, hide_index=True, height=500,
         )
 else:
-    st.info("Détails des requêtes disponibles avec les vrais logs Log Explorer.")
+    st.info("Request details disponibles avec les vrais logs Log Explorer.")
