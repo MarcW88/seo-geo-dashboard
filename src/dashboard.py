@@ -20,7 +20,7 @@ import streamlit as st
 # ---------------------------------------------------------------------------
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cloudflare.duckdb"
 LOCAL_PRIVATE_DB_PATH = Path(__file__).resolve().parent.parent.parent / "seo-geo-dashboard-data" / "data" / "cloudflare.duckdb"
-PRIVATE_DB_URL = "https://raw.githubusercontent.com/MarcW88/seo-geo-dashboard-data/main/data/cloudflare.duckdb"
+PRIVATE_DB_URL = "https://api.github.com/repos/MarcW88/seo-geo-dashboard-data/contents/data/cloudflare.duckdb"
 
 st.set_page_config(
     page_title="SEO/GEO Dashboard — italiaanse-percolator.nl",
@@ -77,10 +77,14 @@ def ensure_database():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     response = requests.get(
         db_url,
-        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.raw"},
-        timeout=30,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.raw",
+            "X-GitHub-Api-Version": "2022-11-28",
+        },
+        timeout=60,
     )
-    if response.status_code == 200 and response.content:
+    if response.status_code == 200 and len(response.content) > 1000:
         DB_PATH.write_bytes(response.content)
 
 
