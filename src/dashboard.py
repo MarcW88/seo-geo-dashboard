@@ -400,6 +400,18 @@ if HAS_HTTP_LOGS:
         GROUP BY clientrequestuseragent
         ORDER BY total DESC
     """)
+    df_ua_detail = query(f"""
+        SELECT
+            clientrequestuseragent AS user_agent,
+            COUNT(*) AS total,
+            COUNT(DISTINCT clientrequesturi) AS unique_urls,
+            MIN(edgestarttimestamp) AS first_visit,
+            MAX(edgestarttimestamp) AS last_visit
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+        GROUP BY clientrequestuseragent
+        ORDER BY total DESC
+    """)
     df_status = query(f"""
         SELECT edgeresponsestatus AS status_code, COUNT(*) AS total
         FROM cf_http_requests
@@ -432,6 +444,10 @@ else:
     df_daily = query(f"SELECT * FROM cf_requests_daily WHERE {DATE_FILTER} ORDER BY date")
     df_paths_raw = query(f"SELECT path, SUM(count) as total FROM cf_top_paths WHERE {RANGE_FILTER} GROUP BY path ORDER BY total DESC")
     df_ua = query(f"SELECT user_agent, SUM(count) as total FROM cf_user_agents WHERE {RANGE_FILTER} GROUP BY user_agent ORDER BY total DESC")
+    df_ua_detail = df_ua.copy()
+    df_ua_detail["unique_urls"] = None
+    df_ua_detail["first_visit"] = None
+    df_ua_detail["last_visit"] = None
     df_status = query(f"SELECT status_code, SUM(count) as total FROM cf_status_codes WHERE {RANGE_FILTER} GROUP BY status_code ORDER BY total DESC")
     df_cache = query(f"SELECT cache_status, SUM(count) as total FROM cf_cache_status WHERE {RANGE_FILTER} GROUP BY cache_status ORDER BY total DESC")
     df_countries = query(f"SELECT country, SUM(count) as total FROM cf_countries WHERE {RANGE_FILTER} GROUP BY country ORDER BY total DESC")
@@ -450,10 +466,19 @@ if not df_ua.empty:
     df_ua["bot_name"]     = _info["name"]
     df_ua["bot_category"] = _info["category"]
     df_ua["dangerous"]    = _info["dangerous"]
+    if not df_ua_detail.empty:
+        _info_detail = df_ua_detail["user_agent"].apply(lambda ua: pd.Series(extract_bot_info(ua)))
+        df_ua_detail["bot_name"]     = _info_detail["name"]
+        df_ua_detail["bot_category"] = _info_detail["category"]
+        df_ua_detail["dangerous"]    = _info_detail["dangerous"]
     if traffic_filter == "Bots/UA suspects":
         df_ua = df_ua[df_ua["bot_category"] != "Humain"]
+        if not df_ua_detail.empty:
+            df_ua_detail = df_ua_detail[df_ua_detail["bot_category"] != "Humain"]
     elif traffic_filter == "Humains probables":
         df_ua = df_ua[df_ua["bot_category"] == "Humain"]
+        if not df_ua_detail.empty:
+            df_ua_detail = df_ua_detail[df_ua_detail["bot_category"] == "Humain"]
 
 # Enrich paths
 if not df_paths_raw.empty:
@@ -532,16 +557,19 @@ with b_mid:
         st.plotly_chart(fig, use_container_width=True)
 
 with b_right:
-    if not df_ua.empty:
+    if not df_ua_detail.empty:
         bot_detail = (
-            df_ua.groupby(["bot_name", "bot_category", "dangerous"])["total"]
-            .sum().reset_index().sort_values("total", ascending=False)
+            df_ua_detail.groupby(["bot_name", "bot_category", "dangerous"])
+            .agg({"total": "sum", "unique_urls": "sum", "first_visit": "min", "last_visit": "max"})
+            .reset_index().sort_values("total", ascending=False)
         )
         bot_detail["danger"] = bot_detail["dangerous"].apply(lambda d: "\U0001f534" if d else "")
         bot_detail["share %"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(1)
+        bot_detail["first_visit"] = pd.to_datetime(bot_detail["first_visit"]).dt.strftime("%d/%m/%y %H:%M")
+        bot_detail["last_visit"] = pd.to_datetime(bot_detail["last_visit"]).dt.strftime("%d/%m/%y %H:%M")
         st.dataframe(
-            bot_detail[["danger", "bot_name", "bot_category", "total", "share %"]]
-            .rename(columns={"bot_name": "Bot", "bot_category": "Cat\u00e9gorie", "total": "Hits", "danger": "\u26a0"}),
+            bot_detail[["danger", "bot_name", "bot_category", "total", "unique_urls", "share %", "first_visit", "last_visit"]]
+            .rename(columns={"bot_name": "Bot", "bot_category": "Cat\u00e9gorie", "total": "Requests", "unique_urls": "URLs uniques", "danger": "\u26a0", "first_visit": "Premi\u00e8re visite", "last_visit": "Derni\u00e8re visite"}),
             use_container_width=True, hide_index=True, height=300,
         )
 
