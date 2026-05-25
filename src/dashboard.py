@@ -102,14 +102,13 @@ with st.sidebar:
         st.warning("Pas de données. Lance le fetch d'abord.")
 
     st.markdown("---")
-    st.markdown("""
-    <div style="font-size: 12px; color: #9ca3af; line-height: 1.8;">
-        <div style="font-weight: 600; color: #6b7280; margin-bottom: 4px;">Pipeline</div>
-        <div>1. fetch_cloudflare.py</div>
-        <div>2. transform.py</div>
-        <div>3. dashboard.py</div>
-    </div>
-    """, unsafe_allow_html=True)
+    traffic_filter = st.radio("Trafic", ["Tous", "Bots/UA suspects", "Humains probables"])
+    url_filter = st.text_input("URL contient", "")
+    page_type_filter = st.multiselect(
+        "Type de page",
+        ["Home", "Boutique", "Produit", "Review", "Blog", "Catégorie", "Autre"],
+        default=[],
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -134,6 +133,41 @@ DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
 RANGE_FILTER = f"date_range_start >= '{start_date}' AND date_range_end <= '{end_date}'"
 
 
+def classify_path(path: str) -> str:
+    path = path or "/"
+    if path == "/" or path == "/index.html":
+        return "Home"
+    if "boutique" in path:
+        return "Boutique"
+    if "/producten/" in path or "/produits/" in path:
+        return "Produit"
+    if "review" in path:
+        return "Review"
+    if path.startswith("/blog") or "/gidsen/" in path or "/koopgids/" in path:
+        return "Blog"
+    if "/categories/" in path or "/marques/" in path:
+        return "Catégorie"
+    return "Autre"
+
+
+def is_bot_user_agent(user_agent: str) -> bool:
+    ua = (user_agent or "").lower()
+    bot_terms = ["bot", "crawl", "spider", "slurp", "bingpreview", "facebookexternalhit", "mediapartners", "inspectiontool"]
+    return any(term in ua for term in bot_terms)
+
+
+def apply_path_filters(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty or "path" not in df.columns:
+        return df
+    filtered = df.copy()
+    filtered["page_type"] = filtered["path"].apply(classify_path)
+    if url_filter:
+        filtered = filtered[filtered["path"].str.contains(url_filter, case=False, na=False)]
+    if page_type_filter:
+        filtered = filtered[filtered["page_type"].isin(page_type_filter)]
+    return filtered
+
+
 # ---------------------------------------------------------------------------
 # KPIs
 # ---------------------------------------------------------------------------
@@ -149,235 +183,182 @@ total_pageviews = int(df_daily["page_views"].sum())
 total_uniques = int(df_daily["uniques"].sum())
 cache_ratio = (total_cached / total_requests * 100) if total_requests else 0
 
-col1, col2, col3, col4, col5 = st.columns(5)
-col1.metric("Requêtes", f"{total_requests:,}")
-col2.metric("Pages vues", f"{total_pageviews:,}")
-col3.metric("Visiteurs uniques", f"{total_uniques:,}")
+df_paths = query(f"""
+    SELECT path, SUM(count) as total
+    FROM cf_top_paths
+    WHERE {RANGE_FILTER}
+    GROUP BY path
+    ORDER BY total DESC
+""")
+df_paths = apply_path_filters(df_paths)
+
+df_ua = query(f"""
+    SELECT user_agent, SUM(count) as total
+    FROM cf_user_agents
+    WHERE {RANGE_FILTER}
+    GROUP BY user_agent
+    ORDER BY total DESC
+""")
+if not df_ua.empty:
+    df_ua["is_bot"] = df_ua["user_agent"].apply(is_bot_user_agent)
+    if traffic_filter == "Bots/UA suspects":
+        df_ua = df_ua[df_ua["is_bot"]]
+    elif traffic_filter == "Humains probables":
+        df_ua = df_ua[~df_ua["is_bot"]]
+
+df_status = query(f"""
+    SELECT status_code, SUM(count) as total
+    FROM cf_status_codes
+    WHERE {RANGE_FILTER}
+    GROUP BY status_code
+    ORDER BY total DESC
+""")
+
+df_cache = query(f"""
+    SELECT cache_status, SUM(count) as total
+    FROM cf_cache_status
+    WHERE {RANGE_FILTER}
+    GROUP BY cache_status
+    ORDER BY total DESC
+""")
+
+df_countries = query(f"""
+    SELECT country, SUM(count) as total
+    FROM cf_countries
+    WHERE {RANGE_FILTER}
+    GROUP BY country
+    ORDER BY total DESC
+""")
+
+error_hits = 0
+if not df_status.empty:
+    error_hits = int(df_status[df_status["status_code"] >= 400]["total"].sum())
+error_rate = (error_hits / total_requests * 100) if total_requests else 0
+bot_hits = int(df_ua[df_ua["is_bot"]]["total"].sum()) if not df_ua.empty and "is_bot" in df_ua else 0
+
+st.markdown("""
+<div style="margin-bottom: 1.5rem;">
+    <h1 style="font-size: 1.8rem; font-weight: 650; color: #111827; margin: 0;">Log analyzer mini-sites</h1>
+    <p style="font-size: 14px; color: #6b7280; margin: 6px 0 0 0;">Crawl SEO, qualité technique et sanity check trafic pour italiaanse-percolator.nl.</p>
+</div>
+""", unsafe_allow_html=True)
+
+col1, col2, col3, col4, col5, col6 = st.columns(6)
+col1.metric("Hits totaux", f"{total_requests:,}")
+col2.metric("Hits bots/UA", f"{bot_hits:,}")
+col3.metric("Erreurs 4xx/5xx", f"{error_rate:.1f}%")
 col4.metric("Cache hit", f"{cache_ratio:.1f}%")
-col5.metric("Jours", f"{len(df_daily)}")
+col5.metric("URLs uniques", f"{len(df_paths):,}")
+col6.metric("Pays", f"{len(df_countries):,}")
 
+st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1.5rem 0;">', unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# Tabs
-# ---------------------------------------------------------------------------
-tab_overview, tab_pages, tab_bots, tab_geo, tab_status, tab_cache = st.tabs([
-    "Trafic", "Pages", "Bots & UA", "Pays", "Status codes", "Cache"
-])
-
-# --- Tab: Trafic ---
-with tab_overview:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
+st.subheader("Vue globale trafic")
+overview_left, overview_right = st.columns([2, 1])
+with overview_left:
     df_daily["date"] = pd.to_datetime(df_daily["date"])
-
     fig = px.area(
-        df_daily, x="date", y="requests",
+        df_daily,
+        x="date",
+        y="requests",
         labels={"date": "", "requests": "Requêtes"},
         color_discrete_sequence=["#111827"],
     )
     fig.update_layout(
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(l=0, r=0, t=30, b=0),
-        xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#f0f0f0"),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        margin=dict(l=0, r=0, t=25, b=0),
+        xaxis=dict(showgrid=False),
+        yaxis=dict(showgrid=True, gridcolor="#f0f0f0"),
         font=dict(family="Inter", size=12),
-        title=dict(text="Requêtes par jour", font=dict(size=14)),
+        height=260,
     )
     st.plotly_chart(fig, use_container_width=True)
+with overview_right:
+    if not df_countries.empty:
+        st.caption("Top pays")
+        st.dataframe(df_countries.head(8), use_container_width=True, hide_index=True, height=260)
 
-    # Cached vs non-cached
-    fig2 = go.Figure()
-    fig2.add_trace(go.Bar(x=df_daily["date"], y=df_daily["cached_requests"], name="Cached", marker_color="#d1d5db"))
-    fig2.add_trace(go.Bar(x=df_daily["date"], y=df_daily["requests"] - df_daily["cached_requests"], name="Non-cached", marker_color="#111827"))
-    fig2.update_layout(
-        barmode="stack",
-        plot_bgcolor="white", paper_bgcolor="white",
-        margin=dict(l=0, r=0, t=30, b=0),
-        xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#f0f0f0"),
-        font=dict(family="Inter", size=12),
-        title=dict(text="Cache vs Non-cache par jour", font=dict(size=14)),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
-    )
-    st.plotly_chart(fig2, use_container_width=True)
+st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1.5rem 0;">', unsafe_allow_html=True)
 
-
-# --- Tab: Pages ---
-with tab_pages:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
-    df_paths = query(f"""
-        SELECT path, SUM(count) as total
-        FROM cf_top_paths
-        WHERE {RANGE_FILTER}
-        GROUP BY path
-        ORDER BY total DESC
-        LIMIT 30
-    """)
-
+st.subheader("Crawl SEO / bots")
+crawl_left, crawl_right = st.columns([2, 1])
+with crawl_left:
     if not df_paths.empty:
+        top_paths = df_paths.head(20)
         fig = px.bar(
-            df_paths, x="total", y="path", orientation="h",
-            labels={"total": "Requêtes", "path": ""},
+            top_paths,
+            x="total",
+            y="path",
+            orientation="h",
+            labels={"total": "Hits", "path": ""},
             color_discrete_sequence=["#111827"],
         )
         fig.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=30, b=0),
-            yaxis=dict(autorange="reversed", tickfont=dict(size=11)),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            margin=dict(l=0, r=0, t=25, b=0),
+            yaxis=dict(autorange="reversed", tickfont=dict(size=10)),
             font=dict(family="Inter", size=12),
-            title=dict(text="Top 30 pages les plus demandées", font=dict(size=14)),
-            height=max(400, len(df_paths) * 22),
+            height=420,
         )
         st.plotly_chart(fig, use_container_width=True)
     else:
-        st.info("Pas de données de paths.")
-
-
-# --- Tab: Bots & UA ---
-with tab_bots:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
-    col_bots, col_ua = st.columns(2)
-
-    with col_bots:
-        st.markdown('<p style="font-size:14px;font-weight:600;color:#111827;">Bots détectés</p>', unsafe_allow_html=True)
-        df_bots = query(f"""
-            SELECT user_agent, decision, country, SUM(count) as total
-            FROM cf_bots
-            WHERE {RANGE_FILTER}
-            GROUP BY user_agent, decision, country
-            ORDER BY total DESC
-            LIMIT 20
-        """)
-        if not df_bots.empty:
-            # Truncate long user agents for display
-            df_bots["ua_short"] = df_bots["user_agent"].str[:60]
-            st.dataframe(df_bots[["ua_short", "decision", "country", "total"]], use_container_width=True, hide_index=True)
-        else:
-            st.info("Pas de données bots.")
-
-    with col_ua:
-        st.markdown('<p style="font-size:14px;font-weight:600;color:#111827;">Top User-Agents</p>', unsafe_allow_html=True)
-        df_ua = query(f"""
-            SELECT user_agent, SUM(count) as total
-            FROM cf_user_agents
-            WHERE {RANGE_FILTER}
-            GROUP BY user_agent
-            ORDER BY total DESC
-            LIMIT 20
-        """)
-        if not df_ua.empty:
-            df_ua["ua_short"] = df_ua["user_agent"].str[:80]
-            st.dataframe(df_ua[["ua_short", "total"]], use_container_width=True, hide_index=True)
-        else:
-            st.info("Pas de données user-agents.")
-
-
-# --- Tab: Pays ---
-with tab_geo:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
-    df_countries = query(f"""
-        SELECT country, SUM(count) as total
-        FROM cf_countries
-        WHERE {RANGE_FILTER}
-        GROUP BY country
-        ORDER BY total DESC
-    """)
-
-    if not df_countries.empty:
-        col_map, col_table = st.columns([2, 1])
-
-        with col_map:
-            fig = px.choropleth(
-                df_countries, locations="country", locationmode="country names",
-                color="total", color_continuous_scale=["#f9fafb", "#111827"],
-                labels={"total": "Requêtes", "country": "Pays"},
-            )
-            fig.update_layout(
-                margin=dict(l=0, r=0, t=30, b=0),
-                font=dict(family="Inter", size=12),
-                title=dict(text="Requêtes par pays", font=dict(size=14)),
-                geo=dict(showframe=False, showcoastlines=True, coastlinecolor="#e5e7eb"),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col_table:
-            st.dataframe(df_countries, use_container_width=True, hide_index=True, height=400)
+        st.info("Pas de données URL pour cette période.")
+with crawl_right:
+    st.caption("Top user-agents")
+    if not df_ua.empty:
+        df_ua_display = df_ua.copy()
+        df_ua_display["type"] = df_ua_display["is_bot"].map({True: "Bot/suspect", False: "Humain probable"})
+        df_ua_display["user_agent"] = df_ua_display["user_agent"].str[:70]
+        st.dataframe(df_ua_display[["user_agent", "type", "total"]].head(12), use_container_width=True, hide_index=True, height=420)
     else:
-        st.info("Pas de données pays.")
+        st.info("Pas de données user-agent.")
 
+st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1.5rem 0;">', unsafe_allow_html=True)
 
-# --- Tab: Status codes ---
-with tab_status:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
-    df_status = query(f"""
-        SELECT status_code, SUM(count) as total
-        FROM cf_status_codes
-        WHERE {RANGE_FILTER}
-        GROUP BY status_code
-        ORDER BY total DESC
-    """)
-
+st.subheader("Erreurs & performance technique")
+tech_left, tech_mid, tech_right = st.columns([1, 1, 1])
+with tech_left:
     if not df_status.empty:
-        # Categorize
-        df_status["category"] = df_status["status_code"].apply(
-            lambda x: "2xx OK" if 200 <= x < 300 else "3xx Redirect" if 300 <= x < 400 else "4xx Client Error" if 400 <= x < 500 else "5xx Server Error" if 500 <= x < 600 else "Other"
+        df_status_plot = df_status.copy()
+        df_status_plot["category"] = df_status_plot["status_code"].apply(
+            lambda x: "2xx" if 200 <= x < 300 else "3xx" if 300 <= x < 400 else "4xx" if 400 <= x < 500 else "5xx" if 500 <= x < 600 else "Other"
         )
-
-        col_chart, col_table = st.columns([2, 1])
-
-        with col_chart:
-            df_cat = df_status.groupby("category")["total"].sum().reset_index()
-            colors = {"2xx OK": "#111827", "3xx Redirect": "#6b7280", "4xx Client Error": "#ef4444", "5xx Server Error": "#dc2626", "Other": "#d1d5db"}
-            fig = px.pie(
-                df_cat, values="total", names="category",
-                color="category", color_discrete_map=colors,
-            )
-            fig.update_layout(
-                font=dict(family="Inter", size=12),
-                title=dict(text="Répartition status codes", font=dict(size=14)),
-                margin=dict(l=0, r=0, t=40, b=0),
-            )
-            st.plotly_chart(fig, use_container_width=True)
-
-        with col_table:
-            df_status["status_code"] = df_status["status_code"].astype(str)
-            st.dataframe(df_status[["status_code", "total", "category"]], use_container_width=True, hide_index=True)
-    else:
-        st.info("Pas de données status codes.")
-
-
-# --- Tab: Cache ---
-with tab_cache:
-    st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1rem 0;">', unsafe_allow_html=True)
-
-    df_cache = query(f"""
-        SELECT cache_status, SUM(count) as total
-        FROM cf_cache_status
-        WHERE {RANGE_FILTER}
-        GROUP BY cache_status
-        ORDER BY total DESC
-    """)
-
+        fig = px.bar(
+            df_status_plot,
+            x="status_code",
+            y="total",
+            color="category",
+            labels={"status_code": "Code", "total": "Hits"},
+            color_discrete_map={"2xx": "#111827", "3xx": "#6b7280", "4xx": "#ef4444", "5xx": "#dc2626", "Other": "#d1d5db"},
+        )
+        fig.update_layout(plot_bgcolor="white", paper_bgcolor="white", margin=dict(l=0, r=0, t=25, b=0), height=280, showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+with tech_mid:
     if not df_cache.empty:
         colors_cache = {"hit": "#111827", "miss": "#ef4444", "dynamic": "#6b7280", "expired": "#f59e0b", "none": "#d1d5db"}
-
-        fig = px.bar(
-            df_cache, x="cache_status", y="total",
-            labels={"cache_status": "Status", "total": "Requêtes"},
-            color="cache_status", color_discrete_map=colors_cache,
-        )
-        fig.update_layout(
-            plot_bgcolor="white", paper_bgcolor="white",
-            margin=dict(l=0, r=0, t=30, b=0),
-            font=dict(family="Inter", size=12),
-            title=dict(text="Répartition cache", font=dict(size=14)),
-            showlegend=False,
-            xaxis=dict(showgrid=False), yaxis=dict(showgrid=True, gridcolor="#f0f0f0"),
-        )
+        fig = px.pie(df_cache, values="total", names="cache_status", color="cache_status", color_discrete_map=colors_cache)
+        fig.update_layout(font=dict(family="Inter", size=12), margin=dict(l=0, r=0, t=25, b=0), height=280)
         st.plotly_chart(fig, use_container_width=True)
+with tech_right:
+    st.caption("Status codes")
+    if not df_status.empty:
+        st.dataframe(df_status, use_container_width=True, hide_index=True, height=280)
 
-        st.dataframe(df_cache, use_container_width=True, hide_index=True)
-    else:
-        st.info("Pas de données cache.")
+st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1.5rem 0;">', unsafe_allow_html=True)
+
+st.subheader("Exploration d'URLs")
+if not df_paths.empty:
+    explorer = df_paths.copy()
+    explorer["share"] = explorer["total"] / explorer["total"].sum() * 100
+    explorer = explorer[["path", "page_type", "total", "share"]]
+    st.dataframe(explorer, use_container_width=True, hide_index=True, height=320)
+    st.download_button(
+        "Exporter les URLs filtrées",
+        explorer.to_csv(index=False).encode("utf-8"),
+        file_name="filtered_urls.csv",
+        mime="text/csv",
+    )
+else:
+    st.info("Aucune URL à explorer.")
