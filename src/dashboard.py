@@ -165,18 +165,30 @@ with st.sidebar:
 # No data guard
 # ---------------------------------------------------------------------------
 if start_date is None:
-    st.markdown("""
-    <div style="padding: 3rem; text-align: center;">
-        <h2 style="color: #111827; font-weight: 600;">Pas encore de données</h2>
-        <p style="color: #6b7280; font-size: 14px; margin-top: 8px;">
-            Lance le pipeline pour commencer :
-        </p>
-        <code style="display: block; margin: 1rem auto; padding: 12px; background: #f9fafb; border-radius: 6px; max-width: 400px;">
-            python -m src.fetch_cloudflare<br>
-            python -m src.transform
-        </code>
-    </div>
-    """, unsafe_allow_html=True)
+    st.title("Pas encore de données")
+
+    db_exists = DB_PATH.exists()
+    local_exists = LOCAL_PRIVATE_DB_PATH.exists()
+    try:
+        has_token = bool(st.secrets.get("GITHUB_TOKEN", ""))
+    except Exception:
+        has_token = False
+
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.markdown("### Diagnostic")
+        st.write(f"{'✅' if db_exists else '❌'} DB locale : `{DB_PATH}`")
+        st.write(f"{'✅' if local_exists else '❌'} DB data-repo : `{LOCAL_PRIVATE_DB_PATH}`")
+        st.write(f"{'✅' if has_token else '❌'} GITHUB_TOKEN dans secrets Streamlit")
+    with col_b:
+        st.markdown("### À faire")
+        if not has_token:
+            st.warning("Ajoute `GITHUB_TOKEN` dans Streamlit Cloud → App → Settings → Secrets")
+            st.code("""GITHUB_TOKEN = "github_pat_xxx"\nPRIVATE_DB_URL = "https://api.github.com/repos/MarcW88/seo-geo-dashboard-data/contents/data/cloudflare.duckdb" """, language="toml")
+        elif not db_exists:
+            st.warning("Token présent mais DB non téléchargée. Vérifie les permissions du token (Contents: Read sur seo-geo-dashboard-data).")
+        else:
+            st.info("DB trouvée mais vide. Relance l'app.")
     st.stop()
 
 DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
