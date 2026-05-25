@@ -712,10 +712,11 @@ st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 st.markdown('<div class="section-label">Request Details</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    exclude_css_js = st.checkbox("Exclure CSS/JS", value=True)
-    exclude_images = st.checkbox("Exclure Images", value=True)
-    exclude_xml = st.checkbox("Exclure XML", value=True)
-    exclude_fonts = st.checkbox("Exclure Fonts", value=True)
+    content_type_filter = st.selectbox(
+        "Filtrer par type de contenu",
+        ["Tous", "Page", "Asset", "API", "Admin", "Sitemap", "Autre"],
+        index=0
+    )
 
     df_requests = query(f"""
         SELECT
@@ -732,21 +733,16 @@ if HAS_HTTP_LOGS:
     if not df_requests.empty:
         df_requests["bot_name"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["name"])
         df_requests["bot_category"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["category"])
+        df_requests["content_type"] = df_requests["url"].apply(classify_path)
         df_requests["timestamp"] = pd.to_datetime(df_requests["timestamp"]).dt.strftime("%d/%m/%y %H:%M")
         df_requests["response_time_ms"] = df_requests["response_time_ms"].round(0).astype(int)
 
-        if exclude_css_js:
-            df_requests = df_requests[~df_requests["url"].str.match(r".*\.(css|js)$", case=False, na=False)]
-        if exclude_images:
-            df_requests = df_requests[~df_requests["url"].str.match(r".*\.(png|jpg|jpeg|gif|svg|ico|webp)$", case=False, na=False)]
-        if exclude_xml:
-            df_requests = df_requests[~df_requests["url"].str.match(r".*\.xml$", case=False, na=False)]
-        if exclude_fonts:
-            df_requests = df_requests[~df_requests["url"].str.match(r".*\.(woff|woff2|ttf|eot)$", case=False, na=False)]
+        if content_type_filter != "Tous":
+            df_requests = df_requests[df_requests["content_type"] == content_type_filter]
 
         st.dataframe(
-            df_requests[["url", "bot_name", "bot_category", "status", "response_time_ms", "timestamp"]]
-            .rename(columns={"url": "URL", "bot_name": "Bot", "bot_category": "Catégorie", "status": "Status", "response_time_ms": "Temps (ms)", "timestamp": "Timestamp"}),
+            df_requests[["url", "bot_name", "bot_category", "content_type", "status", "response_time_ms", "timestamp"]]
+            .rename(columns={"url": "URL", "bot_name": "Bot", "bot_category": "Catégorie", "content_type": "Type", "status": "Status", "response_time_ms": "Temps (ms)", "timestamp": "Timestamp"}),
             use_container_width=True, hide_index=True, height=500,
         )
 else:
