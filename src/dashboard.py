@@ -576,6 +576,37 @@ with b_right:
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
+# Section 2.5 — Crawl Timeline
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Crawl Timeline</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    df_timeline_raw = query(f"""
+        SELECT
+            DATE_TRUNC('hour', edgestarttimestamp) AS hour,
+            clientrequestuseragent AS user_agent
+        FROM cf_http_requests
+        WHERE {DATE_FILTER}
+    """)
+    if not df_timeline_raw.empty:
+        df_timeline_raw["hour"] = pd.to_datetime(df_timeline_raw["hour"])
+        df_timeline_raw["bot_category"] = df_timeline_raw["user_agent"].apply(lambda ua: extract_bot_info(ua)["category"])
+        df_bot_timeline = df_timeline_raw.groupby("hour").agg(
+            total_hits=("user_agent", "count"),
+            bot_hits=("bot_category", lambda x: (x != "Humain").sum())
+        ).reset_index()
+        fig = px.line(df_bot_timeline, x="hour", y=["total_hits", "bot_hits"],
+                     labels={"value": "Hits", "variable": "Type"},
+                     color_discrete_sequence=["#38bdf8", "#f59e0b"])
+        fig.update_layout(**dark_layout(height=280, title=None, xaxis_title="Heure", yaxis_title="Hits",
+                                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=11))))
+        st.plotly_chart(fig, use_container_width=True)
+else:
+    st.info("Timeline disponible avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
 # Section 3 — Top pages + Temps de réponse
 # ---------------------------------------------------------------------------
 st.markdown('<div class="section-label">Top Pages & Performance</div>', unsafe_allow_html=True)
