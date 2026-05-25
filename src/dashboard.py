@@ -176,15 +176,18 @@ def classify_path(path: str) -> str:
 # Database connection
 # ---------------------------------------------------------------------------
 def ensure_database():
-    if DB_PATH.exists():
+    import shutil
+    # Check if local DB exists and is valid (not empty)
+    if DB_PATH.exists() and DB_PATH.stat().st_size > 1000:
+        # Valid local DB, use it
         if str(_APP_ROOT).startswith("/mount"):
+            # On Streamlit Cloud, check if we need to refresh from private repo
             if DB_PATH.stat().st_size < 1000:
                 if LOCAL_PRIVATE_DB_PATH.exists():
-                    import shutil
                     shutil.copy2(LOCAL_PRIVATE_DB_PATH, DB_PATH)
     else:
-        if LOCAL_PRIVATE_DB_PATH.exists():
-            import shutil
+        # Local DB doesn't exist or is empty, copy from private repo
+        if LOCAL_PRIVATE_DB_PATH.exists() and LOCAL_PRIVATE_DB_PATH.stat().st_size > 1000:
             DB_PATH.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(LOCAL_PRIVATE_DB_PATH, DB_PATH)
         else:
