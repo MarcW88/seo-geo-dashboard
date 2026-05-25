@@ -205,7 +205,8 @@ if start_date is None:
     st.stop()
 
 DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
-RANGE_FILTER = f"date_range_start >= '{start_date}' AND date_range_end <= '{end_date}'"
+# Overlap: the stored range covers any part of the selected period
+RANGE_FILTER = f"date_range_start <= '{end_date}' AND date_range_end >= '{start_date}'"
 
 
 def classify_path(path: str) -> str:
@@ -331,7 +332,7 @@ st.markdown('<hr style="border:none;border-top:1px solid #f0f0f0;margin:1.5rem 0
 st.subheader("Vue globale trafic")
 overview_left, overview_right = st.columns([2, 1])
 with overview_left:
-    df_daily["date"] = pd.to_datetime(df_daily["date"])
+    df_daily["date"] = pd.to_datetime(df_daily["date"]).dt.date
     fig = px.area(
         df_daily,
         x="date",
