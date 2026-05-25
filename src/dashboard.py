@@ -59,39 +59,36 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 # DB connection
 # ---------------------------------------------------------------------------
-@st.cache_resource
-def get_conn():
-    ensure_database()
-    if not DB_PATH.exists():
-        return None
-    return duckdb.connect(str(DB_PATH), read_only=True)
-
-
 def ensure_database():
+    """Rend la DB disponible localement ou via GitHub token."""
     if DB_PATH.exists():
         return
-
     if LOCAL_PRIVATE_DB_PATH.exists():
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
         DB_PATH.write_bytes(LOCAL_PRIVATE_DB_PATH.read_bytes())
         return
-
-    token = st.secrets.get("GITHUB_TOKEN", "")
-    db_url = st.secrets.get("PRIVATE_DB_URL", PRIVATE_DB_URL)
+    try:
+        token = st.secrets.get("GITHUB_TOKEN", "")
+        db_url = st.secrets.get("PRIVATE_DB_URL", PRIVATE_DB_URL)
+    except Exception:
+        return
     if not token:
         return
-
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     response = requests.get(
         db_url,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github.raw",
-        },
+        headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github.raw"},
         timeout=30,
     )
     if response.status_code == 200 and response.content:
         DB_PATH.write_bytes(response.content)
+
+
+@st.cache_resource
+def get_conn():
+    if not DB_PATH.exists():
+        return None
+    return duckdb.connect(str(DB_PATH), read_only=True)
 
 
 def query(sql: str) -> pd.DataFrame:
@@ -104,6 +101,11 @@ def query(sql: str) -> pd.DataFrame:
         st.error(f"Erreur SQL: {e}")
         return pd.DataFrame()
 
+
+# ---------------------------------------------------------------------------
+# Init — DB must be ready before any query
+# ---------------------------------------------------------------------------
+ensure_database()
 
 # ---------------------------------------------------------------------------
 # Sidebar
