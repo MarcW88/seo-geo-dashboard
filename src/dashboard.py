@@ -12,12 +12,14 @@ import duckdb
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import requests
 import streamlit as st
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "cloudflare.duckdb"
+PRIVATE_DB_URL = "https://raw.githubusercontent.com/MarcW88/seo-geo-dashboard-data/main/data/cloudflare.duckdb"
 
 st.set_page_config(
     page_title="SEO/GEO Dashboard — italiaanse-percolator.nl",
@@ -58,9 +60,32 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 @st.cache_resource
 def get_conn():
+    ensure_database()
     if not DB_PATH.exists():
         return None
     return duckdb.connect(str(DB_PATH), read_only=True)
+
+
+def ensure_database():
+    if DB_PATH.exists():
+        return
+
+    token = st.secrets.get("GITHUB_TOKEN", "")
+    db_url = st.secrets.get("PRIVATE_DB_URL", PRIVATE_DB_URL)
+    if not token:
+        return
+
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    response = requests.get(
+        db_url,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github.raw",
+        },
+        timeout=30,
+    )
+    if response.status_code == 200 and response.content:
+        DB_PATH.write_bytes(response.content)
 
 
 def query(sql: str) -> pd.DataFrame:

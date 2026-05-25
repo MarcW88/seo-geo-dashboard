@@ -7,3 +7,7 @@ venv/
 
 # DuckDB lock files
 *.wal
+
+# Private analytics data lives in seo-geo-dashboard-data
+data/*
+!data/.gitkeep

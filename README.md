@@ -1,19 +1,24 @@
-# SEO/GEO Dashboard — italiaanse-percolator.nl
+# SEO/GEO Dashboard App
 
-Dashboard analytics basé sur Cloudflare pour le suivi SEO et GEO du site.
+Application Streamlit déployable pour analyser les logs/analytics Cloudflare de `italiaanse-percolator.nl`.
+
+Ce repo contient uniquement l'application : **aucune donnée analytics privée n'est commitée ici**.
+
+## Repos
+
+| Repo | Rôle | Visibilité |
+|---|---|---|
+| `seo-geo-dashboard` | App Streamlit déployable | Public ou privé |
+| `seo-geo-dashboard-data` | DuckDB + raw JSON + pipeline Cloudflare | Privé |
 
 ## Architecture
 
 ```
-Cloudflare API (GraphQL)
-    ↓
-fetch_cloudflare.py     → data/raw/cloudflare/YYYY-MM-DD.json
-    ↓
-transform.py            → data/cloudflare.duckdb
-    ↓
-dashboard.py            → Streamlit + Plotly
-    ↓
-GitHub Actions          → Automatisation quotidienne
+seo-geo-dashboard-data
+    └── data/cloudflare.duckdb
+              ↓ via GitHub token
+seo-geo-dashboard
+    └── src/dashboard.py → Streamlit Cloud
 ```
 
 ## Structure
@@ -21,99 +26,49 @@ GitHub Actions          → Automatisation quotidienne
 ```
 seo-geo-dashboard/
 ├── src/
-│   ├── fetch_cloudflare.py    # Connexion API + GraphQL Analytics
-│   ├── transform.py           # Raw JSON → DuckDB
-│   └── dashboard.py           # Streamlit dashboard
+│   └── dashboard.py
 ├── data/
-│   ├── raw/cloudflare/        # JSON bruts par jour
-│   ├── processed/             # Exports parquet/csv (optionnel)
-│   └── cloudflare.duckdb      # Base analytique
-├── .github/workflows/
-│   └── daily-cloudflare.yml   # GitHub Actions quotidienne
-├── .streamlit/config.toml     # Thème Streamlit
-├── .env.example
+│   └── .gitkeep
+├── .streamlit/config.toml
 ├── requirements.txt
 └── README.md
 ```
 
-## Quick Start
+## Déploiement Streamlit
 
-### 1. Installation
+Dans Streamlit Cloud, ajoute ces secrets :
+
+```toml
+GITHUB_TOKEN = "ghp_xxx"
+PRIVATE_DB_URL = "https://raw.githubusercontent.com/MarcW88/seo-geo-dashboard-data/main/data/cloudflare.duckdb"
+```
+
+Le `GITHUB_TOKEN` doit avoir accès au repo privé `seo-geo-dashboard-data`.
+
+## Lancer localement
+
+Si tu as déjà `data/cloudflare.duckdb` localement :
 
 ```bash
-cd seo-geo-dashboard
 pip install -r requirements.txt
-cp .env.example .env
-# Éditer .env avec ton CLOUDFLARE_API_TOKEN et CLOUDFLARE_ZONE_ID
-```
-
-### 2. Tester la connexion
-
-```bash
-python -m src.fetch_cloudflare --test
-```
-
-### 3. Récupérer les données
-
-```bash
-python -m src.fetch_cloudflare --days 7
-python -m src.transform
-```
-
-### 4. Lancer le dashboard
-
-```bash
 streamlit run src/dashboard.py
 ```
 
-## Données récupérées
-
-| Table DuckDB | Contenu |
-|---|---|
-| `cf_requests_daily` | Requêtes, bytes, cache, page views, uniques par jour |
-| `cf_top_paths` | URLs les plus demandées |
-| `cf_user_agents` | User-agents (navigateurs, bots) |
-| `cf_countries` | Requêtes par pays |
-| `cf_status_codes` | Codes HTTP (200, 301, 404, etc.) |
-| `cf_cache_status` | Hit, miss, dynamic, expired |
-| `cf_bots` | Bots détectés par Cloudflare Bot Management |
+Si la DB n'existe pas localement, l'app tentera de la télécharger depuis le repo privé avec `GITHUB_TOKEN`.
 
 ## Dashboard
 
-6 onglets :
-- **Trafic** — Requêtes/jour, cache vs non-cache
-- **Pages** — Top 30 URLs les plus crawlées/visitées
-- **Bots & UA** — Bots détectés + user-agents
-- **Pays** — Carte choroplèthe + table
-- **Status codes** — Répartition 2xx/3xx/4xx/5xx
-- **Cache** — Hit/miss/dynamic
+Single-page log analyzer avec :
 
-## GitHub Actions
-
-Le workflow `daily-cloudflare.yml` tourne tous les jours à 05h00 (heure belge).
-
-### Secrets à configurer
-
-Dans le repo GitHub → Settings → Secrets and variables → Actions :
-
-| Secret | Valeur |
-|---|---|
-| `CLOUDFLARE_API_TOKEN` | Ton API token Cloudflare |
-| `CLOUDFLARE_ZONE_ID` | L'ID de la zone italiaanse-percolator.nl |
-
-### Lancement manuel
-
-Actions → Daily Cloudflare Fetch → Run workflow
-
-## Token Cloudflare
-
-Créer un token API sur https://dash.cloudflare.com/profile/api-tokens :
-- Template : **Custom token**
-- Permissions : `Zone > Analytics > Read`
-- Zone Resources : `Include > Specific zone > italiaanse-percolator.nl`
+- KPIs : hits, bots/UA suspects, erreurs, cache hit, URLs, pays
+- Vue globale trafic
+- Crawl SEO / bots
+- Erreurs & performance technique
+- Exploration d'URLs + export CSV
+- Filtres sidebar : période, trafic, URL contient, type de page
 
 ## Important
 
-- **Repo PRIVÉ** — contient des données analytics
-- Le fichier `.env` n'est jamais commité (dans `.gitignore`)
-- Les données DuckDB sont commitées pour persistence entre les runs
+- Ne jamais commiter `data/cloudflare.duckdb` dans ce repo app
+- Les données privées restent dans `seo-geo-dashboard-data`
+- Les secrets Cloudflare restent uniquement dans le repo data ou dans GitHub Actions du repo data
