@@ -263,6 +263,19 @@ if not df_dates.empty and df_dates.iloc[0]["min_d"] is not None:
 else:
     min_date = max_date = None
 
+with st.container():
+    fc1, fc2, fc3 = st.columns([2, 1, 1])
+    with fc1:
+        if min_date:
+            date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
+            start_date, end_date = (date_range if isinstance(date_range, tuple) and len(date_range) == 2 else (min_date, max_date))
+        else:
+            start_date = end_date = None
+    with fc2:
+        bot_filter = st.selectbox("Bot filter", ["All", "Only bots", "Only users"], label_visibility="collapsed")
+    with fc3:
+        status_filter = st.selectbox("Status filter", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+
 if start_date is None:
     st.markdown("## Pas encore de données")
     db_exists = DB_PATH.exists()
@@ -283,19 +296,6 @@ if start_date is None:
         elif not db_exists:
             st.warning("Token présent mais DB non téléchargée. Vérifie les permissions (Contents: Read).")
     st.stop()
-
-with st.container():
-    fc1, fc2, fc3 = st.columns([2, 1, 1])
-    with fc1:
-        if min_date:
-            date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
-            start_date, end_date = (date_range if isinstance(date_range, tuple) and len(date_range) == 2 else (min_date, max_date))
-        else:
-            start_date = end_date = None
-    with fc2:
-        bot_filter = st.selectbox("Bot filter", ["All", "Only bots", "Only users"], label_visibility="collapsed")
-    with fc3:
-        status_filter = st.selectbox("Status filter", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
 
 DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
 
@@ -505,7 +505,7 @@ if HAS_HTTP_LOGS:
         elif file_type_filter == "XML":
             file_filter_sql = "AND clientrequestpath LIKE '%.xml'"
         elif file_type_filter == "Fonts":
-            file_filter_sql = "AND (clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR client_requestpath LIKE '%.eot')"
+            file_filter_sql = "AND (clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR clientrequestpath LIKE '%.eot')"
     
     category_filter_sql = ""
     if category_search:
@@ -635,7 +635,7 @@ if HAS_HTTP_LOGS:
     if toggle_cssjs:
         resource_filters.append("(clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')")
     if toggle_images:
-        resource_filters.append("(clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR client_requestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')")
+        resource_filters.append("(clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR clientrequestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')")
     if toggle_xml:
         resource_filters.append("clientrequestpath LIKE '%.xml'")
     if toggle_fonts:
