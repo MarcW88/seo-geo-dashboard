@@ -75,17 +75,30 @@ def ensure_database():
     if not token:
         return
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    response = requests.get(
+
+    # Step 1 : récupère le download_url via l'API Contents
+    meta = requests.get(
         db_url,
         headers={
             "Authorization": f"Bearer {token}",
-            "Accept": "application/vnd.github.raw",
             "X-GitHub-Api-Version": "2022-11-28",
         },
+        timeout=30,
+    )
+    if meta.status_code != 200:
+        return
+    download_url = meta.json().get("download_url", "")
+    if not download_url:
+        return
+
+    # Step 2 : télécharge le fichier binaire via le download_url signé
+    content = requests.get(
+        download_url,
+        headers={"Authorization": f"Bearer {token}"},
         timeout=60,
     )
-    if response.status_code == 200 and len(response.content) > 1000:
-        DB_PATH.write_bytes(response.content)
+    if content.status_code == 200 and len(content.content) > 1000:
+        DB_PATH.write_bytes(content.content)
 
 
 @st.cache_resource
