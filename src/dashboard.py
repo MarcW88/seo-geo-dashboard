@@ -640,6 +640,40 @@ with p_right:
 st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------------
+# Section 3.5 — Statistics by page category
+# ---------------------------------------------------------------------------
+st.markdown('<div class="section-label">Statistics by Page Category</div>', unsafe_allow_html=True)
+
+if HAS_HTTP_LOGS:
+    df_category_stats = query(f"""
+        SELECT
+            clientrequestpath AS path,
+            COUNT(*) AS hits,
+            AVG(response_time_ms) AS avg_ms
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} AND response_time_ms IS NOT NULL
+        GROUP BY clientrequestpath
+    """)
+    if not df_category_stats.empty:
+        df_category_stats["page_type"] = df_category_stats["path"].apply(classify_path)
+        df_category_summary = df_category_stats.groupby("page_type").agg(
+            hits=("hits", "sum"),
+            unique_urls=("path", "nunique"),
+            avg_ms=("avg_ms", "mean")
+        ).reset_index().sort_values("hits", ascending=False)
+        df_category_summary["avg_ms"] = df_category_summary["avg_ms"].round(0).astype(int)
+        df_category_summary["freq_per_day"] = (df_category_summary["hits"] / (df_daily["date"].nunique() if not df_daily.empty else 1)).round(2)
+        st.dataframe(
+            df_category_summary[["page_type", "hits", "unique_urls", "freq_per_day", "avg_ms"]]
+            .rename(columns={"page_type": "Catégorie", "hits": "Hits", "unique_urls": "URLs uniques", "freq_per_day": "Fréq./jour", "avg_ms": "Temps moy. (ms)"}),
+            use_container_width=True, hide_index=True, height=200,
+        )
+else:
+    st.info("Statistiques par catégorie disponibles avec les vrais logs Log Explorer.")
+
+st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+
+# ---------------------------------------------------------------------------
 # Section 4 — Status codes + Cache
 # ---------------------------------------------------------------------------
 st.markdown('<div class="section-label">Santé Technique</div>', unsafe_allow_html=True)
