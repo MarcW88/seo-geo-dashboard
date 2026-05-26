@@ -11,6 +11,7 @@ import duckdb
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import pytz
 import requests
 import streamlit as st
 
@@ -275,14 +276,29 @@ def table_exists(name: str) -> bool:
 # ---------------------------------------------------------------------------
 ensure_database()
 
-st.markdown("""
-<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:1rem;">
-    <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">Log Analyzer</span>
-    <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
+HAS_HTTP_LOGS = table_exists("cf_http_requests")
+
+# Last fetch timestamp
+_last_fetch = ""
+if HAS_HTTP_LOGS:
+    _df_fetch = query("SELECT MAX(fetched_at) AS last FROM cf_http_requests")
+    if not _df_fetch.empty and _df_fetch.iloc[0]["last"] is not None:
+        _ts = pd.to_datetime(_df_fetch.iloc[0]["last"]).tz_localize("UTC") if pd.to_datetime(_df_fetch.iloc[0]["last"]).tzinfo is None else pd.to_datetime(_df_fetch.iloc[0]["last"])
+        _paris = _ts.astimezone(pytz.timezone("Europe/Paris"))
+        _last_fetch = _paris.strftime("%-d %b %Y à %H:%M")
+
+st.markdown(f"""
+<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1rem;">
+    <div style="display:flex;align-items:baseline;gap:12px;">
+        <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">Log Analyzer</span>
+        <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
+    </div>
+    <div style="font-size:11px;color:#475569;text-align:right;">
+        {"Dernière mise à jour : <span style='color:#94a3b8'>" + _last_fetch + "</span> &nbsp;·&nbsp;" if _last_fetch else ""}
+        Prochaine maj : <span style='color:#94a3b8'>chaque jour à 05h00 (Paris)</span>
+    </div>
 </div>
 """, unsafe_allow_html=True)
-
-HAS_HTTP_LOGS = table_exists("cf_http_requests")
 
 # Date range
 if HAS_HTTP_LOGS:
