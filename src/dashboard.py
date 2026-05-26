@@ -277,7 +277,7 @@ ensure_database()
 
 st.markdown("""
 <div style="display:flex;align-items:baseline;gap:12px;margin-bottom:1rem;">
-    <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">⚡ Log Analyzer</span>
+    <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">Log Analyzer</span>
     <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
 </div>
 """, unsafe_allow_html=True)
