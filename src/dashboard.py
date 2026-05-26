@@ -10,6 +10,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import requests
 import streamlit as st
 
@@ -30,9 +31,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
-# ---------------------------------------------------------------------------
-# Dark tech CSS
-# ---------------------------------------------------------------------------
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
@@ -65,22 +63,14 @@ section[data-testid="stSidebar"] { display: none !important; }
     letter-spacing: 2px;
     color: #38bdf8;
     padding-bottom: 6px;
-    border-bottom: 1px solid #1e293b;
-    margin-bottom: 12px;
-}
-.filter-bar {
-    background: #1e293b;
-    border: 1px solid #334155;
-    border-radius: 10px;
-    padding: 1rem 1.5rem;
-    margin-bottom: 1.5rem;
+    border-bottom: 1px solid #334155;
+    margin-bottom: 14px;
+    margin-top: 8px;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# Plotly dark layout base
-# ---------------------------------------------------------------------------
+
 def dark_layout(**kwargs):
     base = dict(
         plot_bgcolor="#1e293b",
@@ -88,15 +78,17 @@ def dark_layout(**kwargs):
         font=dict(family="Inter", size=12, color="#94a3b8"),
         margin=dict(l=0, r=0, t=30, b=0),
         xaxis=dict(showgrid=False, color="#334155", tickcolor="#334155"),
-        yaxis=dict(showgrid=True, gridcolor="#1e293b", color="#334155"),
+        yaxis=dict(showgrid=True, gridcolor="#334155", color="#94a3b8"),
     )
     base.update(kwargs)
     return base
 
+
 # ---------------------------------------------------------------------------
-# Bot identification
+# Bot identification — comprehensive list including scanners
 # ---------------------------------------------------------------------------
 _BOTS = [
+    # Search engines
     ("googlebot", "Googlebot", "Search engines", False),
     ("google-inspectiontool", "Google Inspection Tool", "Search engines", False),
     ("googleother", "Google Other", "Search engines", False),
@@ -110,6 +102,7 @@ _BOTS = [
     ("yandexbot", "YandexBot", "Search engines", False),
     ("baiduspider", "Baidu Spider", "Search engines", False),
     ("applebot", "Applebot", "Search engines", False),
+    # AI bots
     ("gptbot", "GPTBot (OpenAI)", "AI bots", False),
     ("chatgpt-user", "ChatGPT-User (OpenAI)", "AI bots", False),
     ("oai-searchbot", "OAI SearchBot (OpenAI)", "AI bots", False),
@@ -129,6 +122,7 @@ _BOTS = [
     ("ccbot", "CCBot (Common Crawl)", "AI bots", False),
     ("ia_archiver", "Wayback Machine (Archive.org)", "AI bots", False),
     ("archive.org_bot", "archive.org_bot", "AI bots", False),
+    # SEO tools
     ("ahrefsbot", "Ahrefsbot", "SEO tools", False),
     ("semrushbot", "SEMrushbot", "SEO tools", False),
     ("mj12bot", "Majestic MJ12Bot", "SEO tools", False),
@@ -137,54 +131,91 @@ _BOTS = [
     ("sitebulb", "Sitebulb", "SEO tools", False),
     ("serpstatbot", "SerpstatBot", "SEO tools", False),
     ("rogerbot", "Moz Rogerbot", "SEO tools", False),
+    # Social networks
     ("facebookexternalhit", "Facebook External Hit", "Social networks", False),
     ("facebot", "Facebot (Facebook)", "Social networks", False),
     ("twitterbot", "TwitterBot", "Social networks", False),
     ("linkedinbot", "LinkedInBot", "Social networks", False),
     ("pinterestbot", "Pinterestbot", "Social networks", False),
     ("slackbot", "Slackbot", "Social networks", False),
-    ("python-requests", "Python Requests", "Other bots", False),
-    ("axios", "Axios", "Other bots", False),
-    ("curl/", "cURL", "Other bots", False),
-    ("wget/", "Wget", "Other bots", False),
-    ("go-http-client", "Go HTTP Client", "Other bots", False),
-    ("okhttp", "OkHttp", "Other bots", False),
-    ("scrapy", "Scrapy", "Other bots", False),
-    ("headlesschrome", "Headless Chrome", "Other bots", False),
+    # Scanners / Security (dangerous)
+    ("tlm-audit-scanner", "TLM Audit Scanner", "Scanners", True),
+    ("masscan", "Masscan", "Scanners", True),
+    ("zgrab", "ZGrab", "Scanners", True),
+    ("nmap", "Nmap", "Scanners", True),
+    ("nikto", "Nikto", "Scanners", True),
+    ("sqlmap", "SQLMap", "Scanners", True),
+    ("nuclei", "Nuclei", "Scanners", True),
+    ("dirbuster", "DirBuster", "Scanners", True),
+    ("gobuster", "GoBuster", "Scanners", True),
+    ("shodan", "Shodan", "Scanners", True),
+    ("censys", "Censys", "Scanners", True),
+    ("expanse", "Expanse", "Scanners", True),
+    ("internetmeasurement", "Internet Measurement", "Scanners", False),
+    ("netcraft", "Netcraft", "Scanners", False),
+    ("security", "Security Scanner", "Scanners", True),
+    ("pentest", "Pentest Tool", "Scanners", True),
+    ("vulnerability", "Vulnerability Scanner", "Scanners", True),
+    # HTTP clients / scripts
+    ("python-requests", "Python Requests", "HTTP clients", False),
+    ("python/", "Python", "HTTP clients", False),
+    ("aiohttp", "aiohttp", "HTTP clients", False),
+    ("axios", "Axios", "HTTP clients", False),
+    ("curl/", "cURL", "HTTP clients", False),
+    ("wget/", "Wget", "HTTP clients", False),
+    ("go-http-client", "Go HTTP Client", "HTTP clients", False),
+    ("okhttp", "OkHttp", "HTTP clients", False),
+    ("scrapy", "Scrapy", "HTTP clients", False),
+    ("headlesschrome", "Headless Chrome", "HTTP clients", False),
+    ("java/", "Java HTTP Client", "HTTP clients", False),
+    ("libwww-perl", "Perl LWP", "HTTP clients", False),
+    ("php/", "PHP HTTP Client", "HTTP clients", False),
 ]
+
+# Build a flat SQL-compatible keyword list for bot detection
+_BOT_SQL_KEYWORDS = [kw for kw, *_ in _BOTS]
+
+def _bot_sql_filter() -> str:
+    """Return a SQL fragment to identify bots via LIKE patterns."""
+    conditions = " OR ".join([f"LOWER(clientrequestuseragent) LIKE '%{kw}%'" for kw in _BOT_SQL_KEYWORDS])
+    return f"({conditions})"
+
 
 def extract_bot_info(ua: str) -> dict:
     u = (ua or "").lower()
     for keyword, name, category, dangerous in _BOTS:
         if keyword in u:
             return {"name": name, "category": category, "dangerous": dangerous}
-    return {"name": "Other", "category": "Other bots", "dangerous": False}
+    return {"name": "Unknown", "category": "Unknown", "dangerous": False}
+
+
+def is_bot_ua(ua: str) -> bool:
+    u = (ua or "").lower()
+    return any(kw in u for kw, *_ in _BOTS)
+
 
 def classify_path(path: str) -> str:
     p = (path or "").lower()
-    if p.endswith((".css", ".js")):
+    if p.endswith((".css", ".js", ".map")):
         return "CSS/JS"
-    elif p.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp")):
+    elif p.endswith((".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp", ".avif")):
         return "Images"
     elif p.endswith((".woff", ".woff2", ".ttf", ".eot")):
         return "Fonts"
-    elif p.endswith(".xml"):
+    elif p.endswith(".xml") or "sitemap" in p:
         return "XML"
     elif "/api/" in p or p.startswith("/api"):
         return "API"
-    elif "/admin" in p or "/kentico" in p.lower():
-        return "Admin"
-    elif p.endswith((".html", ".htm")) or "?" in p:
+    elif p.endswith((".html", ".htm")):
         return "HTML"
-    elif p in ("/", "/fr", "/en", "/nl"):
-        return "HTML"
-    elif p.startswith(("/fr/", "/en/", "/nl/")):
+    elif "?" in p or p.startswith(("/fr/", "/en/", "/nl/", "/de/")) or p in ("/", "/fr", "/en", "/nl"):
         return "HTML"
     else:
         return "Other"
 
+
 # ---------------------------------------------------------------------------
-# DB connection (original logic)
+# DB connection
 # ---------------------------------------------------------------------------
 def ensure_database():
     if DB_PATH.exists() and not str(_APP_ROOT).startswith("/mount"):
@@ -203,17 +234,18 @@ def ensure_database():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     meta = requests.get(db_url, headers={"Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28"}, timeout=30)
     if meta.status_code != 200:
-        st.warning(f"⚠️ GitHub API: HTTP {meta.status_code} — {meta.text[:200]}")
+        st.warning(f"GitHub API: HTTP {meta.status_code}")
         return
     download_url = meta.json().get("download_url", "")
     if not download_url:
-        st.warning(f"⚠️ No download_url in response: {meta.text[:200]}")
+        st.warning("No download_url in GitHub API response")
         return
     content = requests.get(download_url, headers={"Authorization": f"Bearer {token}"}, timeout=60)
     if content.status_code == 200 and len(content.content) > 1000:
         DB_PATH.write_bytes(content.content)
     else:
-        st.warning(f"⚠️ Download failed: HTTP {content.status_code}, {len(content.content)} bytes")
+        st.warning(f"Download failed: HTTP {content.status_code}, {len(content.content)} bytes")
+
 
 @st.cache_resource
 def get_conn():
@@ -221,60 +253,72 @@ def get_conn():
         return None
     return duckdb.connect(str(DB_PATH), read_only=True)
 
+
 def query(sql: str) -> pd.DataFrame:
     conn = get_conn()
     if conn is None:
         return pd.DataFrame()
     try:
         return conn.execute(sql).fetchdf()
-    except Exception:
+    except Exception as e:
+        st.error(f"Query error: {e}\n\n`{sql[:300]}`")
         return pd.DataFrame()
 
-def table_exists(table_name: str) -> bool:
-    df = query(f"SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = '{table_name}'")
+
+def table_exists(name: str) -> bool:
+    df = query(f"SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_name = '{name}'")
     return not df.empty and int(df.iloc[0]["n"]) > 0
+
 
 # ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
 ensure_database()
 
-# ---------------------------------------------------------------------------
-# Header
-# ---------------------------------------------------------------------------
 st.markdown("""
-<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:1.5rem;">
-    <span style="font-size:1.5rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">⚡ Log Analyzer</span>
-    <span style="font-size:13px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:1rem;">
+    <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">⚡ Log Analyzer</span>
+    <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
 </div>
 """, unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# GlobalFiltersBar
-# ---------------------------------------------------------------------------
 HAS_HTTP_LOGS = table_exists("cf_http_requests")
+
+# Date range
 if HAS_HTTP_LOGS:
     df_dates = query("SELECT MIN(date) as min_d, MAX(date) as max_d FROM cf_http_requests")
 else:
-    df_dates = query("SELECT MIN(date) as min_d, MAX(date) as max_d FROM cf_requests_daily")
+    df_dates = pd.DataFrame()
+
 if not df_dates.empty and df_dates.iloc[0]["min_d"] is not None:
     min_date = pd.to_datetime(df_dates.iloc[0]["min_d"]).date()
     max_date = pd.to_datetime(df_dates.iloc[0]["max_d"]).date()
 else:
     min_date = max_date = None
 
-with st.container():
-    fc1, fc2, fc3 = st.columns([2, 1, 1])
-    with fc1:
-        if min_date:
-            date_range = st.date_input("Période", value=(min_date, max_date), min_value=min_date, max_value=max_date, label_visibility="collapsed")
-            start_date, end_date = (date_range if isinstance(date_range, tuple) and len(date_range) == 2 else (min_date, max_date))
+# ---------------------------------------------------------------------------
+# GlobalFiltersBar
+# ---------------------------------------------------------------------------
+fc1, fc2, fc3 = st.columns([3, 1, 1])
+with fc1:
+    if min_date:
+        date_range = st.date_input(
+            "Période",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date,
+            label_visibility="collapsed",
+        )
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = date_range
         else:
-            start_date = end_date = None
-    with fc2:
-        bot_filter = st.selectbox("Bot filter", ["All", "Only bots", "Only users"], label_visibility="collapsed")
-    with fc3:
-        status_filter = st.selectbox("Status filter", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+            start_date, end_date = min_date, max_date
+    else:
+        start_date = end_date = None
+with fc2:
+    traffic_type = st.selectbox("Traffic type", ["All", "Bots only", "Users only"], label_visibility="collapsed")
+with fc3:
+    status_global = st.selectbox("Status", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
 
 if start_date is None:
     st.markdown("## Pas encore de données")
@@ -284,396 +328,459 @@ if start_date is None:
         has_token = bool(st.secrets.get("GITHUB_TOKEN", ""))
     except Exception:
         has_token = False
-    col_a, col_b = st.columns(2)
-    with col_a:
+    c1, c2 = st.columns(2)
+    with c1:
         st.markdown("### Diagnostic")
         st.write(f"{'✅' if db_exists else '❌'} DB : `{DB_PATH}`")
         st.write(f"{'✅' if local_exists else '❌'} DB data-repo : `{LOCAL_PRIVATE_DB_PATH}`")
-        st.write(f"{'✅' if has_token else '❌'} GITHUB_TOKEN dans secrets Streamlit")
-    with col_b:
+        st.write(f"{'✅' if has_token else '❌'} GITHUB_TOKEN secret")
+    with c2:
         if not has_token:
-            st.code('GITHUB_TOKEN = "github_pat_xxx"\nPRIVATE_DB_URL = "https://api.github.com/repos/MarcW88/seo-geo-dashboard-data/contents/data/cloudflare.duckdb"', language="toml")
+            st.code('GITHUB_TOKEN = "github_pat_xxx"\nPRIVATE_DB_URL = "https://api.github.com/repos/..."', language="toml")
         elif not db_exists:
-            st.warning("Token présent mais DB non téléchargée. Vérifie les permissions (Contents: Read).")
+            st.warning("Token présent mais DB non téléchargée. Vérifie les permissions.")
     st.stop()
 
+# Build shared SQL filters
 DATE_FILTER = f"date >= '{start_date}' AND date <= '{end_date}'"
 
-# Build SQL filters
-bot_filter_sql = ""
-if bot_filter == "Only bots":
-    bot_filter_sql = "AND LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%'"
-elif bot_filter == "Only users":
-    bot_filter_sql = "AND LOWER(clientrequestuseragent) NOT LIKE '%bot%' AND LOWER(clientrequestuseragent) NOT LIKE '%crawler%' AND LOWER(clientrequestuseragent) NOT LIKE '%spider%'"
+BOT_SQL = _bot_sql_filter()
 
-status_filter_sql = ""
-if status_filter != "All":
-    if status_filter == "2xx":
-        status_filter_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
-    elif status_filter == "3xx":
-        status_filter_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
-    elif status_filter == "4xx":
-        status_filter_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
-    elif status_filter == "5xx":
-        status_filter_sql = "AND edgeresponsestatus >= 500 AND edgeresponsestatus < 600"
+traffic_sql = ""
+if traffic_type == "Bots only":
+    traffic_sql = f"AND {BOT_SQL}"
+elif traffic_type == "Users only":
+    traffic_sql = f"AND NOT {BOT_SQL}"
 
-# ---------------------------------------------------------------------------
-# View 1: Vue globale (Header + KPIs)
-# ---------------------------------------------------------------------------
-st.markdown('<div class="section-label">Vue globale</div>', unsafe_allow_html=True)
+status_sql = ""
+if status_global == "2xx":
+    status_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
+elif status_global == "3xx":
+    status_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
+elif status_global == "4xx":
+    status_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
+elif status_global == "5xx":
+    status_sql = "AND edgeresponsestatus >= 500 AND edgeresponsestatus < 600"
+
+BASE_WHERE = f"WHERE {DATE_FILTER} {traffic_sql} {status_sql}"
+
+
+# ===========================================================================
+# VIEW 1 — Request Distribution
+# ===========================================================================
+st.markdown('<div class="section-label">Request Distribution</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    # Total requests
-    df_total = query(f"""
+    df_kpi = query(f"""
         SELECT
             COUNT(*) AS total_hits,
-            COUNT(DISTINCT clientrequesturi) AS unique_urls
+            COUNT(DISTINCT clientrequesturi) AS unique_urls,
+            SUM(CASE WHEN {BOT_SQL} THEN 1 ELSE 0 END) AS bot_hits,
+            SUM(CASE WHEN NOT {BOT_SQL} THEN 1 ELSE 0 END) AS user_hits
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {bot_filter_sql} {status_filter_sql}
-    """).iloc[0]
-    
-    # User vs Bot split
-    df_split = query(f"""
-        SELECT
-            CASE 
-                WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
-                THEN 'bot' 
-                ELSE 'user' 
-            END AS type,
-            COUNT(*) AS hits
-        FROM cf_http_requests
-        WHERE {DATE_FILTER} {status_filter_sql}
-        GROUP BY type
+        {BASE_WHERE}
     """)
-    
-    user_hits = 0
-    bot_hits = 0
-    if not df_split.empty:
-        user_hits = int(df_split[df_split["type"] == "user"]["hits"].sum())
-        bot_hits = int(df_split[df_split["type"] == "bot"]["hits"].sum())
-    
-    # Bots detected
-    df_bots_detected = query(f"""
-        SELECT COUNT(DISTINCT clientrequestuseragent) AS bots_detected
-        FROM cf_http_requests
-        WHERE {DATE_FILTER} 
-        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
-    """).iloc[0]
-    
-    # Status codes
-    df_status = query(f"""
+    df_codes = query(f"""
         SELECT
-            CASE 
+            CASE
                 WHEN edgeresponsestatus >= 200 AND edgeresponsestatus < 300 THEN '2xx'
                 WHEN edgeresponsestatus >= 300 AND edgeresponsestatus < 400 THEN '3xx'
                 WHEN edgeresponsestatus >= 400 AND edgeresponsestatus < 500 THEN '4xx'
-                WHEN edgeresponsestatus >= 500 AND edgeresponsestatus < 600 THEN '5xx'
+                WHEN edgeresponsestatus >= 500 THEN '5xx'
                 ELSE 'other'
-            END AS status_group,
+            END AS grp,
+            edgeresponsestatus AS code,
             COUNT(*) AS hits
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {bot_filter_sql}
-        GROUP BY status_group
+        {BASE_WHERE}
+        GROUP BY grp, edgeresponsestatus
+        ORDER BY grp, code
     """)
-    
-    k1, k2, k3, k4 = st.columns(4)
-    
-    total_hits = int(df_total["total_hits"])
-    k1.metric("Total requests", f"{total_hits:,}", 
-              help=f"Users: {user_hits:,} ({user_hits/total_hits*100:.1f}%), Bots: {bot_hits:,} ({bot_hits/total_hits*100:.1f}%)")
-    k2.metric("Unique URLs", f"{int(df_total['unique_urls']):,}")
-    k3.metric("Bots detected", f"{int(df_bots_detected['bots_detected']):,}")
-    
-    # Status codes as clickable badges
-    status_text = " | ".join([f"{row['status_group']}: {row['hits']:,}" for _, row in df_status.iterrows()])
-    k4.metric("Response codes", status_text if not df_status.empty else "—")
+    df_bots_count = query(f"""
+        SELECT COUNT(DISTINCT clientrequestuseragent) AS bots_detected
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} {status_sql}
+        AND {BOT_SQL}
+    """)
 
-st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+    row = df_kpi.iloc[0] if not df_kpi.empty else {}
+    total = int(row.get("total_hits", 0)) or 1
+    bot_hits = int(row.get("bot_hits", 0))
+    user_hits = int(row.get("user_hits", 0))
+    unique_urls = int(row.get("unique_urls", 0))
+    bots_detected = int(df_bots_count.iloc[0]["bots_detected"]) if not df_bots_count.empty else 0
 
-# ---------------------------------------------------------------------------
-# View 2: Bot activity
-# ---------------------------------------------------------------------------
+    col_donut, col_kpis = st.columns([1, 2])
+
+    with col_donut:
+        fig_donut = go.Figure(go.Pie(
+            labels=["Users", "Bots"],
+            values=[user_hits, bot_hits],
+            hole=0.6,
+            marker=dict(colors=["#38bdf8", "#f59e0b"]),
+            textinfo="none",
+        ))
+        fig_donut.update_layout(
+            **dark_layout(height=200, margin=dict(l=0, r=0, t=10, b=10)),
+            showlegend=True,
+            legend=dict(
+                orientation="v", x=1, y=0.5,
+                font=dict(color="#94a3b8", size=12),
+                bgcolor="rgba(0,0,0,0)",
+            ),
+            annotations=[dict(
+                text=f"<b>{total:,}</b>",
+                x=0.5, y=0.5,
+                font=dict(size=20, color="#f1f5f9"),
+                showarrow=False,
+            )],
+        )
+        st.plotly_chart(fig_donut, use_container_width=True)
+        st.markdown(
+            f'<div style="text-align:center;font-size:12px;color:#94a3b8;">Users <b style="color:#38bdf8">{user_hits:,}</b> &nbsp;|&nbsp; Bots <b style="color:#f59e0b">{bot_hits:,}</b></div>',
+            unsafe_allow_html=True,
+        )
+
+    with col_kpis:
+        k1, k2 = st.columns(2)
+        k1.metric("Unique URLs", f"{unique_urls:,}")
+        k2.metric("Bots detected", f"{bots_detected:,}")
+
+        if not df_codes.empty:
+            st.markdown("**Response codes**")
+            STATUS_COLORS = {"2xx": "#22c55e", "3xx": "#38bdf8", "4xx": "#f59e0b", "5xx": "#ef4444", "other": "#64748b"}
+            for grp in ["2xx", "3xx", "4xx", "5xx"]:
+                grp_df = df_codes[df_codes["grp"] == grp].sort_values("hits", ascending=False)
+                if grp_df.empty:
+                    continue
+                badges = " ".join([
+                    f'<span style="background:{STATUS_COLORS.get(grp,"#64748b")}22;border:1px solid {STATUS_COLORS.get(grp,"#64748b")};border-radius:4px;padding:2px 8px;font-size:11px;color:{STATUS_COLORS.get(grp,"#94a3b8")};margin-right:4px;">'
+                    f'<b>{int(r["code"])}</b> {int(r["hits"]):,}</span>'
+                    for _, r in grp_df.iterrows()
+                ])
+                st.markdown(badges, unsafe_allow_html=True)
+
+st.markdown('<div style="height:1.2rem;"></div>', unsafe_allow_html=True)
+
+
+# ===========================================================================
+# VIEW 2 — Bot activity
+# ===========================================================================
 st.markdown('<div class="section-label">Bot activity</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    df_ua_detail = query(f"""
+    df_ua = query(f"""
         SELECT
-            clientrequestuseragent AS user_agent,
-            COUNT(*) AS total,
+            clientrequestuseragent AS ua,
+            COUNT(*) AS hits,
             COUNT(DISTINCT clientrequesturi) AS unique_urls,
             MIN(edgestarttimestamp) AS first_seen,
             MAX(edgestarttimestamp) AS last_seen
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {status_filter_sql}
-        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
+        WHERE {DATE_FILTER} {status_sql}
+        AND {BOT_SQL}
         GROUP BY clientrequestuseragent
-        ORDER BY total DESC
+        ORDER BY hits DESC
     """)
 
-    if not df_ua_detail.empty:
-        _info = df_ua_detail["user_agent"].apply(lambda ua: pd.Series(extract_bot_info(ua)))
-        df_ua_detail["bot_name"] = _info["name"]
-        df_ua_detail["bot_category"] = _info["category"]
-        
-        # Show raw user agents for debugging
-        with st.expander("Debug: Raw user agents"):
-            st.dataframe(df_ua_detail[["user_agent", "bot_name", "bot_category", "total"]].head(20), use_container_width=True, hide_index=True)
-        
-        bot_detail = (
-            df_ua_detail.groupby(["bot_name", "bot_category"])
-            .agg({"total": "sum", "unique_urls": "sum", "first_seen": "min", "last_seen": "max"})
-            .reset_index().sort_values("total", ascending=False)
+    if not df_ua.empty:
+        info = df_ua["ua"].apply(lambda u: pd.Series(extract_bot_info(u)))
+        df_ua["Bot"] = info["name"]
+        df_ua["Category"] = info["category"]
+        df_ua["Dangerous"] = info["dangerous"]
+
+        bot_agg = (
+            df_ua.groupby(["Bot", "Category", "Dangerous"])
+            .agg(Hits=("hits", "sum"), unique_urls=("unique_urls", "sum"), first_seen=("first_seen", "min"), last_seen=("last_seen", "max"))
+            .reset_index().sort_values("Hits", ascending=False)
         )
-        if not bot_detail.empty:
-            bot_detail["share_of_total"] = (bot_detail["total"] / bot_detail["total"].sum() * 100).round(2)
-            bot_detail["first_seen"] = pd.to_datetime(bot_detail["first_seen"]).dt.strftime("%d/%m/%y %H:%M")
-            bot_detail["last_seen"] = pd.to_datetime(bot_detail["last_seen"]).dt.strftime("%d/%m/%y %H:%M")
-            st.dataframe(
-                bot_detail[["bot_name", "bot_category", "total", "share_of_total", "first_seen", "last_seen"]]
-                .rename(columns={"bot_name": "Bot", "bot_category": "Category", "total": "Hits", "share_of_total": "% of total", "first_seen": "First seen", "last_seen": "Last seen"}),
-                use_container_width=True, hide_index=True, height=400,
-            )
-        else:
-            st.info("No bot data found for the selected period and filters.")
-else:
-    st.info("Bot activity disponible avec les vrais logs Log Explorer.")
+        total_bot_hits = bot_agg["Hits"].sum() or 1
+        bot_agg["% of total"] = (bot_agg["Hits"] / total_bot_hits * 100).round(1).astype(str) + "%"
+        bot_agg["First seen"] = pd.to_datetime(bot_agg["first_seen"]).dt.strftime("%d/%m/%y %H:%M")
+        bot_agg["Last seen"] = pd.to_datetime(bot_agg["last_seen"]).dt.strftime("%d/%m/%y %H:%M")
+        bot_agg["⚠"] = bot_agg["Dangerous"].apply(lambda x: "🔴" if x else "")
 
-st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+        st.dataframe(
+            bot_agg[["Bot", "Category", "Hits", "% of total", "unique_urls", "First seen", "Last seen", "⚠"]]
+            .rename(columns={"unique_urls": "Unique URLs"}),
+            use_container_width=True,
+            hide_index=True,
+            height=350,
+        )
+    else:
+        st.info("No bots detected for the selected period.")
 
-# ---------------------------------------------------------------------------
-# View 3: Crawl timeline
-# ---------------------------------------------------------------------------
+st.markdown('<div style="height:1.2rem;"></div>', unsafe_allow_html=True)
+
+
+# ===========================================================================
+# VIEW 3 — Crawl timeline
+# ===========================================================================
 st.markdown('<div class="section-label">Crawl timeline</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    group_by = st.selectbox("Group by", ["day", "week"], label_visibility="collapsed")
-    
-    if group_by == "day":
-        df_timeline = query(f"""
-            SELECT
-                DATE(edgestarttimestamp) AS date,
-                CASE 
-                    WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
-                    THEN 'Bot' 
-                    ELSE 'User' 
-                END AS type,
-                COUNT(*) AS hits
-            FROM cf_http_requests
-            WHERE {DATE_FILTER} {status_filter_sql}
-            GROUP BY DATE(edgestarttimestamp), type
-            ORDER BY date
-        """)
+    tc1, tc2 = st.columns([1, 1])
+    with tc1:
+        group_by = st.selectbox("Group by (timeline)", ["day", "week"], label_visibility="collapsed")
+    with tc2:
+        timeline_view = st.selectbox("View (timeline)", ["Absolute", "Relative (%)"], label_visibility="collapsed")
+
+    trunc = "DATE(edgestarttimestamp)" if group_by == "day" else "DATE_TRUNC('week', edgestarttimestamp)"
+    df_tl = query(f"""
+        SELECT
+            {trunc} AS dt,
+            CASE
+                WHEN NOT {BOT_SQL} THEN 'Users'
+                WHEN LOWER(clientrequestuseragent) LIKE '%googlebot%' OR LOWER(clientrequestuseragent) LIKE '%bingbot%' OR LOWER(clientrequestuseragent) LIKE '%yandex%' OR LOWER(clientrequestuseragent) LIKE '%baidu%' THEN 'Search engines'
+                WHEN LOWER(clientrequestuseragent) LIKE '%gptbot%' OR LOWER(clientrequestuseragent) LIKE '%claude%' OR LOWER(clientrequestuseragent) LIKE '%perplexity%' OR LOWER(clientrequestuseragent) LIKE '%anthropic%' THEN 'AI bots'
+                WHEN LOWER(clientrequestuseragent) LIKE '%ahrefs%' OR LOWER(clientrequestuseragent) LIKE '%semrush%' OR LOWER(clientrequestuseragent) LIKE '%mj12%' THEN 'SEO tools'
+                WHEN LOWER(clientrequestuseragent) LIKE '%facebook%' OR LOWER(clientrequestuseragent) LIKE '%twitter%' OR LOWER(clientrequestuseragent) LIKE '%linkedin%' THEN 'Social'
+                ELSE 'Other bots'
+            END AS category,
+            COUNT(*) AS hits
+        FROM cf_http_requests
+        WHERE {DATE_FILTER} {status_sql}
+        GROUP BY {trunc}, category
+        ORDER BY dt
+    """)
+
+    if not df_tl.empty:
+        df_tl["dt"] = pd.to_datetime(df_tl["dt"])
+        cat_order = ["Users", "Search engines", "AI bots", "SEO tools", "Social", "Other bots"]
+        cat_colors = {
+            "Users": "#38bdf8",
+            "Search engines": "#22c55e",
+            "AI bots": "#a78bfa",
+            "SEO tools": "#f59e0b",
+            "Social": "#ec4899",
+            "Other bots": "#64748b",
+        }
+        if timeline_view == "Relative (%)":
+            pivot = df_tl.pivot_table(index="dt", columns="category", values="hits", aggfunc="sum", fill_value=0)
+            pivot = pivot.div(pivot.sum(axis=1), axis=0) * 100
+            df_tl_plot = pivot.reset_index().melt(id_vars="dt", var_name="category", value_name="hits")
+            yaxis_label = "% of hits"
+        else:
+            df_tl_plot = df_tl
+            yaxis_label = "Hits"
+
+        fig_tl = px.bar(
+            df_tl_plot, x="dt", y="hits", color="category",
+            color_discrete_map=cat_colors,
+            category_orders={"category": cat_order},
+            labels={"hits": yaxis_label, "dt": "Date", "category": ""},
+        )
+        fig_tl.update_layout(**dark_layout(
+            height=300,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, bgcolor="rgba(0,0,0,0)"),
+            yaxis_title=yaxis_label,
+        ))
+        st.plotly_chart(fig_tl, use_container_width=True)
     else:
-        df_timeline = query(f"""
-            SELECT
-                DATE_TRUNC('week', edgestarttimestamp) AS date,
-                CASE 
-                    WHEN LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%' 
-                    THEN 'Bot' 
-                    ELSE 'User' 
-                END AS type,
-                COUNT(*) AS hits
-            FROM cf_http_requests
-            WHERE {DATE_FILTER} {status_filter_sql}
-            GROUP BY DATE_TRUNC('week', edgestarttimestamp), type
-            ORDER BY date
-        """)
-    
-    if not df_timeline.empty:
-        df_timeline["date"] = pd.to_datetime(df_timeline["date"])
-        fig = px.bar(df_timeline, x="date", y="hits", color="type",
-                     color_discrete_map={"User": "#38bdf8", "Bot": "#f59e0b"},
-                     labels={"hits": "Hits", "type": "Type"})
-        fig.update_layout(**dark_layout(height=300, title=None, xaxis_title="Date", yaxis_title="Hits",
-                                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)))
-        st.plotly_chart(fig, use_container_width=True)
-else:
-    st.info("Crawl timeline disponible avec les vrais logs Log Explorer.")
+        st.info("No data for timeline.")
 
-st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+st.markdown('<div style="height:1.2rem;"></div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# View 4: Statistics by page category
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# VIEW 4 — Statistics by page category
+# ===========================================================================
 st.markdown('<div class="section-label">Statistics by page category</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    category_search = st.text_input("Search category...", "", placeholder="ex: /fr, /en", label_visibility="collapsed")
-    file_type_filter = st.selectbox("File type", ["All", "HTML", "CSS/JS", "Images", "XML", "Fonts", "Other"], label_visibility="collapsed")
-    
-    file_filter_sql = ""
-    if file_type_filter != "All":
-        if file_type_filter == "HTML":
-            file_filter_sql = "AND (clientrequestpath LIKE '%.html' OR clientrequestpath LIKE '%.htm' OR clientrequestpath LIKE '?' OR clientrequestpath IN ('/', '/fr', '/en', '/nl') OR clientrequestpath LIKE '/fr/%' OR clientrequestpath LIKE '/en/%' OR clientrequestpath LIKE '/nl/%')"
-        elif file_type_filter == "CSS/JS":
-            file_filter_sql = "AND (clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')"
-        elif file_type_filter == "Images":
-            file_filter_sql = "AND (clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR clientrequestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')"
-        elif file_type_filter == "XML":
-            file_filter_sql = "AND clientrequestpath LIKE '%.xml'"
-        elif file_type_filter == "Fonts":
-            file_filter_sql = "AND (clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR clientrequestpath LIKE '%.eot')"
-    
-    category_filter_sql = ""
-    if category_search:
-        category_filter_sql = f"AND clientrequestpath LIKE '%{category_search}%'"
-    
-    df_category = query(f"""
+    sc1, sc2 = st.columns([1, 2])
+    with sc1:
+        level_filter = st.selectbox("Level (category)", ["1st level", "2nd level"], label_visibility="collapsed")
+    with sc2:
+        cat_search = st.text_input("Search category...", "", label_visibility="collapsed")
+
+    def get_category(path: str, level: str) -> str:
+        parts = (path or "").split("/")
+        parts = [p for p in parts if p]
+        if level == "1st level":
+            return "/" + parts[0] if parts else "/"
+        else:
+            return "/" + "/".join(parts[:2]) if len(parts) >= 2 else ("/" + parts[0] if parts else "/")
+
+    df_cat_raw = query(f"""
         SELECT
             clientrequestpath AS path,
-            COUNT(*) AS total_hits,
+            COUNT(*) AS hits,
             COUNT(DISTINCT clientrequestpath) AS unique_urls,
-            AVG(response_time_ms) AS avg_duration_ms
+            AVG(response_time_ms) AS avg_ms
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {bot_filter_sql} {status_filter_sql} {file_filter_sql} {category_filter_sql}
+        {BASE_WHERE}
         GROUP BY clientrequestpath
-        ORDER BY total_hits DESC
-        LIMIT 100
     """)
-    
-    if not df_category.empty:
-        df_category["category"] = df_category["path"].apply(lambda p: "/".join(p.split("/")[:2]) if p.count("/") > 0 else p)
-        df_category_summary = df_category.groupby("category").agg(
-            total_hits=("total_hits", "sum"),
-            unique_urls=("unique_urls", "sum"),
-            avg_duration_ms=("avg_duration_ms", "mean")
-        ).reset_index().sort_values("total_hits", ascending=False)
-        df_category_summary["hits_per_day"] = (df_category_summary["total_hits"] / (df_dates.iloc[0]["max_d"] - df_dates.iloc[0]["min_d"]).days if not df_dates.empty else 1).round(2)
-        df_category_summary["avg_duration_ms"] = df_category_summary["avg_duration_ms"].round(0).astype(int)
-        st.dataframe(
-            df_category_summary[["category", "total_hits", "unique_urls", "hits_per_day", "avg_duration_ms"]]
-            .rename(columns={"category": "Category", "total_hits": "Total hits", "unique_urls": "Unique URLs", "hits_per_day": "Hits/day", "avg_duration_ms": "Avg duration (ms)"}),
-            use_container_width=True, hide_index=True, height=300,
+
+    if not df_cat_raw.empty:
+        days_range = max((end_date - start_date).days, 1)
+        df_cat_raw["category"] = df_cat_raw["path"].apply(lambda p: get_category(p, level_filter))
+        if cat_search:
+            df_cat_raw = df_cat_raw[df_cat_raw["category"].str.contains(cat_search, case=False, na=False)]
+
+        cat_summary = (
+            df_cat_raw.groupby("category")
+            .agg(total_hits=("hits", "sum"), unique_urls=("unique_urls", "sum"), avg_ms=("avg_ms", "mean"))
+            .reset_index().sort_values("total_hits", ascending=False)
         )
-else:
-    st.info("Statistics by page category disponibles avec les vrais logs Log Explorer.")
+        cat_summary["hits_per_day"] = (cat_summary["total_hits"] / days_range).round(1)
+        cat_summary["avg_ms"] = cat_summary["avg_ms"].fillna(0).round(0).astype(int)
+        cat_summary["period"] = f"{start_date} - {end_date}"
 
-st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+        col_bars, col_table = st.columns([1, 2])
 
-# ---------------------------------------------------------------------------
-# View 5: Crawled pages
-# ---------------------------------------------------------------------------
+        with col_bars:
+            fig_bar = px.bar(
+                cat_summary.head(10).sort_values("total_hits"),
+                x="total_hits", y="category", orientation="h",
+                color="avg_ms",
+                color_continuous_scale=["#22c55e", "#f59e0b", "#ef4444"],
+                labels={"total_hits": "Hits", "category": "", "avg_ms": "Avg ms"},
+            )
+            fig_bar.update_layout(**dark_layout(height=300, margin=dict(l=0, r=0, t=10, b=0)))
+            st.plotly_chart(fig_bar, use_container_width=True)
+
+        with col_table:
+            st.dataframe(
+                cat_summary[["category", "total_hits", "unique_urls", "hits_per_day", "avg_ms", "period"]]
+                .rename(columns={
+                    "category": "Category", "total_hits": "Total hits",
+                    "unique_urls": "Unique URLs", "hits_per_day": "Hits/day",
+                    "avg_ms": "Avg duration (ms)", "period": "Period",
+                }),
+                use_container_width=True,
+                hide_index=True,
+                height=300,
+            )
+    else:
+        st.info("No data for category stats.")
+
+st.markdown('<div style="height:1.2rem;"></div>', unsafe_allow_html=True)
+
+
+# ===========================================================================
+# VIEW 5 — Crawled pages
+# ===========================================================================
 st.markdown('<div class="section-label">Crawled pages</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    url_filter = st.text_input("Filter by URL...", "", placeholder="ex: /en/shoes", label_visibility="collapsed")
-    bot_specific_filter = st.selectbox("Bot", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
-    
-    bot_specific_filter_sql = ""
-    if bot_specific_filter != "All":
-        bot_specific_filter_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{bot_specific_filter.lower()}%'"
-    
-    url_filter_sql = ""
-    if url_filter:
-        url_filter_sql = f"AND clientrequesturi LIKE '%{url_filter}%'"
-    
-    df_crawled = query(f"""
+    cp1, cp2 = st.columns([2, 1])
+    with cp1:
+        cp_url = st.text_input("Filter by URL...", "", label_visibility="collapsed")
+    with cp2:
+        cp_bot = st.selectbox("Bot (pages)", ["All"] + sorted(set(b[1] for b in _BOTS)), label_visibility="collapsed")
+
+    cp_url_sql = f"AND clientrequesturi LIKE '%{cp_url}%'" if cp_url else ""
+    cp_bot_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{cp_bot.lower()}%'" if cp_bot != "All" else ""
+
+    df_pages = query(f"""
         SELECT
             clientrequesturi AS url,
             COUNT(*) AS total_hits,
             COUNT(DISTINCT clientrequestuseragent) AS unique_bots,
             MAX(edgestarttimestamp) AS last_crawl
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {status_filter_sql} {bot_specific_filter_sql} {url_filter_sql}
-        AND (LOWER(clientrequestuseragent) LIKE '%bot%' OR LOWER(clientrequestuseragent) LIKE '%crawler%' OR LOWER(clientrequestuseragent) LIKE '%spider%')
+        WHERE {DATE_FILTER} {status_sql}
+        AND {BOT_SQL}
+        {cp_url_sql} {cp_bot_sql}
         GROUP BY clientrequesturi
         ORDER BY last_crawl DESC
-        LIMIT 100
+        LIMIT 500
     """)
-    
-    if not df_crawled.empty:
-        df_crawled["last_crawl"] = pd.to_datetime(df_crawled["last_crawl"]).dt.strftime("%d/%m/%y %H:%M")
+
+    if not df_pages.empty:
+        df_pages["last_crawl"] = pd.to_datetime(df_pages["last_crawl"]).dt.strftime("%d/%m/%y %H:%M")
+        st.caption(f"{len(df_pages):,} crawled pages")
         st.dataframe(
-            df_crawled[["url", "total_hits", "unique_bots", "last_crawl"]]
-            .rename(columns={"url": "URL", "total_hits": "Total hits", "unique_bots": "Unique bots", "last_crawl": "Last crawl"}),
-            use_container_width=True, hide_index=True, height=400,
+            df_pages.rename(columns={"url": "URL", "total_hits": "Total hits", "unique_bots": "Unique bots", "last_crawl": "Last crawl"}),
+            use_container_width=True, hide_index=True, height=380,
         )
-else:
-    st.info("Crawled pages disponibles avec les vrais logs Log Explorer.")
+    else:
+        st.info("No crawled pages for the selected period.")
 
-st.markdown('<div style="height:1.5rem;"></div>', unsafe_allow_html=True)
+st.markdown('<div style="height:1.2rem;"></div>', unsafe_allow_html=True)
 
-# ---------------------------------------------------------------------------
-# View 6: Request details
-# ---------------------------------------------------------------------------
+
+# ===========================================================================
+# VIEW 6 — Request details
+# ===========================================================================
 st.markdown('<div class="section-label">Request details</div>', unsafe_allow_html=True)
 
 if HAS_HTTP_LOGS:
-    rd_url_filter = st.text_input("URL contains...", "", placeholder="ex: /product", label_visibility="collapsed")
-    rd_bot_filter = st.selectbox("Bot (Request details)", ["All"] + [b[1] for b in _BOTS], label_visibility="collapsed")
-    rd_status_filter = st.selectbox("Status (Request details)", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
-    
+    rd1, rd2, rd3 = st.columns([2, 1, 1])
+    with rd1:
+        rd_url = st.text_input("URL contains...", "", label_visibility="collapsed")
+    with rd2:
+        rd_bot = st.selectbox("Bot (details)", ["All"] + sorted(set(b[1] for b in _BOTS)), label_visibility="collapsed")
+    with rd3:
+        rd_status = st.selectbox("Status (details)", ["All", "2xx", "3xx", "4xx", "5xx"], label_visibility="collapsed")
+
     # Resource type toggles
-    col1, col2, col3, col4, col5 = st.columns(5)
-    with col1:
-        toggle_html = st.checkbox("HTML", value=True)
-    with col2:
-        toggle_cssjs = st.checkbox("CSS/JS", value=False)
-    with col3:
-        toggle_images = st.checkbox("Images", value=False)
-    with col4:
-        toggle_xml = st.checkbox("XML", value=False)
-    with col5:
-        toggle_fonts = st.checkbox("Fonts", value=False)
-    
-    rd_bot_filter_sql = ""
-    if rd_bot_filter != "All":
-        rd_bot_filter_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{rd_bot_filter.lower()}%'"
-    
-    rd_status_filter_sql = ""
-    if rd_status_filter != "All":
-        if rd_status_filter == "2xx":
-            rd_status_filter_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
-        elif rd_status_filter == "3xx":
-            rd_status_filter_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
-        elif rd_status_filter == "4xx":
-            rd_status_filter_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
-        elif rd_status_filter == "5xx":
-            rd_status_filter_sql = "AND edgeresponsestatus >= 500 AND edgeresponsestatus < 600"
-    
-    rd_url_filter_sql = ""
-    if rd_url_filter:
-        rd_url_filter_sql = f"AND clientrequesturi LIKE '%{rd_url_filter}%'"
-    
-    # Build resource type filter
-    resource_filters = []
-    if toggle_html:
-        resource_filters.append("(clientrequestpath LIKE '%.html' OR clientrequestpath LIKE '%.htm' OR clientrequestpath LIKE '?' OR clientrequestpath IN ('/', '/fr', '/en', '/nl') OR clientrequestpath LIKE '/fr/%' OR clientrequestpath LIKE '/en/%' OR clientrequestpath LIKE '/nl/%')")
-    if toggle_cssjs:
-        resource_filters.append("(clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')")
-    if toggle_images:
-        resource_filters.append("(clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR clientrequestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')")
-    if toggle_xml:
-        resource_filters.append("clientrequestpath LIKE '%.xml'")
-    if toggle_fonts:
-        resource_filters.append("(clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR clientrequestpath LIKE '%.eot')")
-    
-    rd_resource_filter_sql = ""
-    if resource_filters:
-        rd_resource_filter_sql = "AND (" + " OR ".join(resource_filters) + ")"
-    
-    df_requests = query(f"""
+    rc1, rc2, rc3, rc4, rc5 = st.columns(5)
+    with rc1:
+        t_html = st.checkbox("HTML", value=True, key="t_html")
+    with rc2:
+        t_css = st.checkbox("CSS/JS", value=False, key="t_css")
+    with rc3:
+        t_img = st.checkbox("Images", value=False, key="t_img")
+    with rc4:
+        t_xml = st.checkbox("XML", value=False, key="t_xml")
+    with rc5:
+        t_font = st.checkbox("Fonts", value=False, key="t_font")
+
+    rd_url_sql = f"AND clientrequesturi LIKE '%{rd_url}%'" if rd_url else ""
+    rd_bot_sql = f"AND LOWER(clientrequestuseragent) LIKE '%{rd_bot.lower()}%'" if rd_bot != "All" else ""
+    if rd_status == "2xx":
+        rd_status_sql = "AND edgeresponsestatus >= 200 AND edgeresponsestatus < 300"
+    elif rd_status == "3xx":
+        rd_status_sql = "AND edgeresponsestatus >= 300 AND edgeresponsestatus < 400"
+    elif rd_status == "4xx":
+        rd_status_sql = "AND edgeresponsestatus >= 400 AND edgeresponsestatus < 500"
+    elif rd_status == "5xx":
+        rd_status_sql = "AND edgeresponsestatus >= 500"
+    else:
+        rd_status_sql = ""
+
+    resource_conds = []
+    if t_html:
+        resource_conds.append("(clientrequestpath NOT LIKE '%.%' OR clientrequestpath LIKE '%.html' OR clientrequestpath LIKE '%.htm')")
+    if t_css:
+        resource_conds.append("(clientrequestpath LIKE '%.css' OR clientrequestpath LIKE '%.js')")
+    if t_img:
+        resource_conds.append("(clientrequestpath LIKE '%.png' OR clientrequestpath LIKE '%.jpg' OR clientrequestpath LIKE '%.jpeg' OR clientrequestpath LIKE '%.gif' OR clientrequestpath LIKE '%.svg' OR clientrequestpath LIKE '%.ico' OR clientrequestpath LIKE '%.webp')")
+    if t_xml:
+        resource_conds.append("clientrequestpath LIKE '%.xml'")
+    if t_font:
+        resource_conds.append("(clientrequestpath LIKE '%.woff' OR clientrequestpath LIKE '%.woff2' OR clientrequestpath LIKE '%.ttf' OR clientrequestpath LIKE '%.eot')")
+    rd_res_sql = "AND (" + " OR ".join(resource_conds) + ")" if resource_conds else ""
+
+    df_req = query(f"""
         SELECT
-            edgestarttimestamp AS datetime,
+            edgestarttimestamp AS dt,
             clientrequesturi AS url,
-            clientrequestuseragent AS user_agent,
-            edgeresponsestatus AS status_code,
+            clientrequestuseragent AS ua,
+            edgeresponsestatus AS status,
             response_time_ms AS duration_ms
         FROM cf_http_requests
-        WHERE {DATE_FILTER} {rd_bot_filter_sql} {rd_status_filter_sql} {rd_url_filter_sql} {rd_resource_filter_sql}
+        WHERE {DATE_FILTER} {traffic_sql} {rd_status_sql} {rd_url_sql} {rd_bot_sql} {rd_res_sql}
         ORDER BY edgestarttimestamp DESC
         LIMIT 1000
     """)
-    
-    if not df_requests.empty:
-        df_requests["datetime"] = pd.to_datetime(df_requests["datetime"]).dt.strftime("%d/%m/%y %H:%M")
-        df_requests["bot"] = df_requests["user_agent"].apply(lambda ua: extract_bot_info(ua)["name"])
-        df_requests["category"] = df_requests["url"].apply(classify_path)
-        df_requests["duration_ms"] = df_requests["duration_ms"].round(0).astype(int)
+
+    if not df_req.empty:
+        df_req["Date/Time"] = pd.to_datetime(df_req["dt"]).dt.strftime("%d/%m/%y %H:%M:%S")
+        df_req["Bot"] = df_req["ua"].apply(lambda u: extract_bot_info(u)["name"])
+        df_req["Category"] = df_req["url"].apply(classify_path)
+        df_req["duration_ms"] = df_req["duration_ms"].fillna(0).round(0).astype(int)
+        st.caption(f"Showing up to 1,000 results")
         st.dataframe(
-            df_requests[["datetime", "url", "bot", "category", "status_code", "duration_ms"]]
-            .rename(columns={"datetime": "Date/Time", "url": "URL", "bot": "Bot", "category": "Category", "status_code": "Status", "duration_ms": "Duration (ms)"}),
-            use_container_width=True, hide_index=True, height=500,
+            df_req[["Date/Time", "url", "Bot", "Category", "status", "duration_ms"]]
+            .rename(columns={"url": "URL", "status": "Status", "duration_ms": "Duration (ms)"}),
+            use_container_width=True,
+            hide_index=True,
+            height=480,
         )
-else:
-    st.info("Request details disponibles avec les vrais logs Log Explorer.")
+    else:
+        st.info("No requests match the current filters.")
+
