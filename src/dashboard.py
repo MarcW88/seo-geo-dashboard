@@ -248,8 +248,9 @@ def ensure_database():
         st.warning(f"Download failed: HTTP {content.status_code}, {len(content.content)} bytes")
 
 
-@st.cache_resource
+@st.cache_resource(ttl=3600)
 def get_conn():
+    ensure_database()
     if not DB_PATH.exists():
         return None
     return duckdb.connect(str(DB_PATH), read_only=True)
@@ -274,8 +275,6 @@ def table_exists(name: str) -> bool:
 # ---------------------------------------------------------------------------
 # Init
 # ---------------------------------------------------------------------------
-ensure_database()
-
 HAS_HTTP_LOGS = table_exists("cf_http_requests")
 
 # Last fetch timestamp
@@ -287,18 +286,23 @@ if HAS_HTTP_LOGS:
         _paris = _ts.astimezone(pytz.timezone("Europe/Paris"))
         _last_fetch = _paris.strftime("%-d %b %Y à %H:%M")
 
-st.markdown(f"""
-<div style="display:flex;align-items:baseline;justify-content:space-between;margin-bottom:1rem;">
-    <div style="display:flex;align-items:baseline;gap:12px;">
-        <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">Log Analyzer</span>
-        <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
-    </div>
-    <div style="font-size:11px;color:#475569;text-align:right;">
-        {"Dernière mise à jour : <span style='color:#94a3b8'>" + _last_fetch + "</span> &nbsp;·&nbsp;" if _last_fetch else ""}
-        Prochaine maj : <span style='color:#94a3b8'>chaque jour à 05h00 (Paris)</span>
-    </div>
+_h_left, _h_right = st.columns([3, 1])
+with _h_left:
+    st.markdown("""
+<div style="display:flex;align-items:baseline;gap:12px;margin-bottom:0.5rem;">
+    <span style="font-size:1.4rem;font-weight:700;color:#f1f5f9;letter-spacing:-0.5px;">Log Analyzer</span>
+    <span style="font-size:12px;color:#64748b;font-family:monospace;">italiaanse-percolator.nl</span>
 </div>
 """, unsafe_allow_html=True)
+with _h_right:
+    _info_parts = []
+    if _last_fetch:
+        _info_parts.append(f"Mis à jour : **{_last_fetch}**")
+    _info_parts.append("Prochain fetch : **05h00 (Paris)**")
+    st.caption("  ·  ".join(_info_parts))
+    if st.button("↺ Refresh", use_container_width=True):
+        st.cache_resource.clear()
+        st.rerun()
 
 # Date range
 if HAS_HTTP_LOGS:
