@@ -790,12 +790,16 @@ if HAS_HTTP_LOGS:
 
     if not df_req.empty:
         df_req["Date/Time"] = pd.to_datetime(df_req["dt"]).dt.strftime("%d/%m/%y %H:%M:%S")
-        df_req["Bot"] = df_req["ua"].apply(lambda u: extract_bot_info(u)["name"])
-        df_req["Category"] = df_req["url"].apply(classify_path)
+        def _label(ua):
+            if is_bot_ua(ua):
+                return extract_bot_info(ua)["name"]
+            return "— Human"
+        df_req["Bot / Visitor"] = df_req["ua"].apply(_label)
+        df_req["Resource"] = df_req["url"].apply(classify_path)
         df_req["duration_ms"] = df_req["duration_ms"].fillna(0).round(0).astype(int)
         st.caption(f"Showing up to 1,000 results")
         st.dataframe(
-            df_req[["Date/Time", "url", "Bot", "Category", "status", "duration_ms"]]
+            df_req[["Date/Time", "url", "Bot / Visitor", "Resource", "status", "duration_ms"]]
             .rename(columns={"url": "URL", "status": "Status", "duration_ms": "Duration (ms)"}),
             use_container_width=True,
             hide_index=True,
